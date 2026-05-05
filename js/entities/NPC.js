@@ -1,6 +1,6 @@
 const TARGET_WIDTH = 100;
 const BOB_AMPLITUDE = 5;
-const BOB_FREQ = 5;      // oscillations per second while moving
+const BOB_FREQ = 2.5;      // oscillations per second while moving
 const BOB_RETURN = 6;    // lerp speed when returning to center
 
 export class NPC {
@@ -54,6 +54,24 @@ export class NPC {
     }
 
     this.sprite.y = this._bobOffset;
+  }
+
+  isInVision(vision) {
+    const scale = Math.abs(this.sprite.scale.y);
+    const halfW = this.sprite.texture.width * scale / 2;
+    const h = this.sprite.texture.height * scale;
+
+    const screenY = this.y + this._bobOffset;
+    const top = screenY - h * this.sprite.anchor.y;
+    const bottom = screenY + h * (1 - this.sprite.anchor.y);
+    const left = this.x - halfW;
+    const right = this.x + halfW;
+
+    const cx = Math.max(left, Math.min(vision.x, right));
+    const cy = Math.max(top, Math.min(vision.y, bottom));
+    const dx = cx - vision.x;
+    const dy = cy - vision.y;
+    return Math.sqrt(dx * dx + dy * dy) <= vision.currentRadius;
   }
 
   setVisible(v) {

@@ -265,7 +265,7 @@ export class Game {
     this.hearts.update(dtMs);
 
     // --- NPC visibility & timer ---
-    const npcInVision = this.vision.isInVision(this.npc.x, this.npc.y);
+    const npcInVision = this.npc.isInVision(this.vision);
     if (!npcInVision) {
       const rate = this._inLove ? LOVE_SLOWDOWN : 1.0;
       this.outOfVisionTimer += dtMs * rate;
@@ -497,7 +497,7 @@ export class Game {
       }
     }
 
-    if (this.vision.isInVision(this.npc.x, this.npc.y)) {
+    if (this.npc.isInVision(this.vision)) {
       const ct = this.vision.targetRadius;
       this.vision.setTargetRadius(Math.max(LOVE_MIN_RADIUS, ct - 22 * dt));
     }
