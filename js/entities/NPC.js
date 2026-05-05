@@ -1,6 +1,6 @@
-const TARGET_WIDTH = 128;
+const TARGET_WIDTH = 100;
 const BOB_AMPLITUDE = 5;
-const BOB_FREQ = 9;      // oscillations per second while moving
+const BOB_FREQ = 5;      // oscillations per second while moving
 const BOB_RETURN = 6;    // lerp speed when returning to center
 
 export class NPC {
