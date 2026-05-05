@@ -12,6 +12,12 @@ import { Game } from './Game.js';
 
   document.body.appendChild(app.view);
 
-  // Start the game — Game handles window resize internally
-  new Game(app);
+  const [idle, moveDown, moveRight, moveUp] = await Promise.all([
+    PIXI.Assets.load('assets/girl_idle.png'),
+    PIXI.Assets.load('assets/girl_move_down.png'),
+    PIXI.Assets.load('assets/girl_move_right.png'),
+    PIXI.Assets.load('assets/girl_move_up.png'),
+  ]);
+
+  new Game(app, { idle, moveDown, moveRight, moveUp });
 })();

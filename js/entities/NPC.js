@@ -1,108 +1,95 @@
-const NPC_SIZE = 28;
+const ANIM_FPS = 6;
+const FRAME_TIME = 1 / ANIM_FPS;
+const TARGET_HEIGHT = 96;
 
-/**
- * NPC 实体 — 病娇少女（占位图形绘制）
- * 预留 `sprite` 属性替换为真实素材。
- */
 export class NPC {
-  constructor(x, y) {
+  constructor(x, y, textures) {
     this.x = x;
     this.y = y;
-    this.speed = 120; // px/s
+    this.speed = 120;
     this._visible = true;
+
+    this._direction = 'down';
+    this._moving = false;
+    this._animTimer = 0;
+    this._animFrame = 0;
+
+    this._frames = this._buildFrames(textures);
+
+    this.sprite = new PIXI.Sprite(this._frames.idle[0]);
+    this.sprite.anchor.set(0.5, 0.85);
+
+    const scale = TARGET_HEIGHT / textures.idle.height;
+    this.sprite.scale.set(scale);
 
     this.display = new PIXI.Container();
     this.display.x = x;
     this.display.y = y;
-    this._draw();
+    this.display.addChild(this.sprite);
   }
 
-  _draw() {
-    this.gfx = new PIXI.Graphics();
-    this.display.addChild(this.gfx);
-    this._redrawGfx();
+  _buildFrames(textures) {
+    const frames = {
+      idle: [textures.idle],
+      down: [],
+      up: [],
+      right: [],
+    };
+
+    for (const [key, tex] of [
+      ['down', textures.moveDown],
+      ['up', textures.moveUp],
+      ['right', textures.moveRight],
+    ]) {
+      const bw = tex.baseTexture.width;
+      const bh = tex.baseTexture.height;
+      const fw = bw / 3;
+      for (let i = 0; i < 3; i++) {
+        frames[key].push(
+          new PIXI.Texture(tex.baseTexture, new PIXI.Rectangle(i * fw, 0, fw, bh))
+        );
+      }
+    }
+
+    return frames;
   }
 
-  _redrawGfx() {
-    const g = this.gfx;
-    g.clear();
+  updateAnimation(dt, dx, dy) {
+    const speed = Math.sqrt(dx * dx + dy * dy);
 
-    // Shadow
-    g.beginFill(0x000000, 0.4);
-    g.drawEllipse(0, NPC_SIZE * 0.7, NPC_SIZE * 0.6, NPC_SIZE * 0.2);
-    g.endFill();
+    if (speed < 0.5) {
+      this._moving = false;
+      this._animFrame = 0;
+      this._animTimer = 0;
+      this.sprite.texture = this._frames.idle[0];
+      this.sprite.scale.x = Math.abs(this.sprite.scale.x);
+    } else {
+      this._moving = true;
 
-    // Body — dark dress
-    g.beginFill(0x1a1a2e);
-    g.moveTo(-8, -4);
-    g.lineTo(-10, 16);
-    g.lineTo(10, 16);
-    g.lineTo(8, -4);
-    g.closePath();
-    g.endFill();
+      if (Math.abs(dx) > Math.abs(dy)) {
+        this._direction = dx > 0 ? 'right' : 'left';
+      } else {
+        this._direction = dy > 0 ? 'down' : 'up';
+      }
 
-    // Dress flare
-    g.beginFill(0x1a1a2e);
-    g.moveTo(-10, 16);
-    g.lineTo(-14, 22);
-    g.lineTo(14, 22);
-    g.lineTo(10, 16);
-    g.closePath();
-    g.endFill();
+      if (this._direction === 'left') {
+        this.sprite.scale.x = -Math.abs(this.sprite.scale.x);
+        this._advanceAnim(dt, 'right');
+      } else {
+        this.sprite.scale.x = Math.abs(this.sprite.scale.x);
+        this._advanceAnim(dt, this._direction);
+      }
+    }
+  }
 
-    // Head
-    g.beginFill(0xf5e6d3);
-    g.drawCircle(0, -8, 7);
-    g.endFill();
-
-    // Hair — long black hair (back layer)
-    g.beginFill(0x0d0d0d);
-    g.moveTo(-7, -14);
-    g.lineTo(-9, -2);
-    g.lineTo(-8, 8);
-    g.lineTo(-5, 2);
-    g.lineTo(-5, -8);
-    g.closePath();
-    g.moveTo(5, -8);
-    g.lineTo(5, 2);
-    g.lineTo(8, 8);
-    g.lineTo(9, -2);
-    g.lineTo(7, -14);
-    g.closePath();
-    // Hair top
-    g.drawEllipse(0, -13, 7.5, 5);
-    // Side bangs
-    g.moveTo(-7, -13);
-    g.lineTo(-8, -8);
-    g.lineTo(-5, -7);
-    g.closePath();
-    g.moveTo(7, -13);
-    g.lineTo(8, -8);
-    g.lineTo(5, -7);
-    g.closePath();
-    g.endFill();
-
-    // Eyes — red, wide
-    g.beginFill(0xff1111);
-    g.drawEllipse(-3, -9, 2, 2.5);
-    g.drawEllipse(3, -9, 2, 2.5);
-    g.endFill();
-    // Eye shine
-    g.beginFill(0xffffff);
-    g.drawCircle(-2.5, -10, 0.8);
-    g.drawCircle(3.5, -10, 0.8);
-    g.endFill();
-
-    // Mouth — tiny smile
-    g.lineStyle(0.8, 0xcc6666);
-    g.arc(0, -5, 2, 0.2, Math.PI - 0.2);
-    g.endFill();
-    g.lineStyle(0);
-
-    // Red ribbon in hair
-    g.beginFill(0xcc1111);
-    g.drawEllipse(6, -14, 3, 1.5);
-    g.endFill();
+  _advanceAnim(dt, key) {
+    this._animTimer += dt;
+    const frames = this._frames[key];
+    while (this._animTimer >= FRAME_TIME) {
+      this._animTimer -= FRAME_TIME;
+      this._animFrame = (this._animFrame + 1) % frames.length;
+    }
+    this.sprite.texture = frames[this._animFrame];
   }
 
   setVisible(v) {

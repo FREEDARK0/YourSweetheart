@@ -22,7 +22,7 @@ const MAX_TOMBSTONES = 5;
 const GHOST_TIMER_PENALTY = 500; // ms added to failure timer if ghost explodes in vision
 
 export class Game {
-  constructor(app) {
+  constructor(app, textures) {
     this.app = app;
     this.state = 'playing';
 
@@ -66,7 +66,7 @@ export class Game {
     this._setupResize();
 
     this.vision = new VisionSystem(this.app, this.layers.overlay, this.mouseX, this.mouseY, this.visionRadius);
-    this.npc = new NPC(this.app.screen.width / 2, this.app.screen.height / 2);
+    this.npc = new NPC(this.app.screen.width / 2, this.app.screen.height / 2, textures);
     this.layers.npcLayer.addChild(this.npc.display);
 
     this.groundText = new GroundText(this.layers.groundTextLayer, this.layers.groundTextOverlay);
@@ -194,7 +194,7 @@ export class Game {
     if (!this._initialTextSpawned) {
       this._initialTextTimer -= dt;
       if (this._initialTextTimer <= 0) {
-        this.groundText.spawn('达令，你要永远注视着我哦', this.npc.x, this.npc.y - 30,
+        this.groundText.spawn('达令，你要永远注视着我哦', this.npc.x, this.npc.y - 100,
           { fontSize: 26, duration: 3000, visibleOutsideVision: true });
         this._initialTextSpawned = true;
       }
@@ -227,6 +227,8 @@ export class Game {
     const itemPositions = items.map(i => ({ x: i.x, y: i.y, type: i.type }));
 
     // --- Update AI (frozen during start delay) ---
+    const prevNpcX = this.npc.x;
+    const prevNpcY = this.npc.y;
     if (this._startDelay > 0) {
       this._startDelay -= dt;
     } else {
@@ -246,6 +248,9 @@ export class Game {
     // Clamp NPC
     this.npc.x = Math.max(20, Math.min(this.app.screen.width - 20, this.npc.x));
     this.npc.y = Math.max(20, Math.min(this.app.screen.height - 20, this.npc.y));
+
+    this.npc.updateAnimation(dt, this.npc.x - prevNpcX, this.npc.y - prevNpcY);
+
     this.npc.display.x = this.npc.x;
     this.npc.display.y = this.npc.y;
 
@@ -475,17 +480,17 @@ export class Game {
       this._loveTextDelay = 0;
 
       this.vision.setGlowColor(0xff6699, 0.45);
-      this.hearts.start(this.npc.x, this.npc.y - 10);
+      this.hearts.start(this.npc.x, this.npc.y - 48);
     }
 
     if (!this._inLove) return;
 
-    this.hearts.setPosition(this.npc.x, this.npc.y - 10);
+    this.hearts.setPosition(this.npc.x, this.npc.y - 48);
 
     if (!this._loveSpawnedText) {
       this._loveTextDelay += dt;
       if (this._loveTextDelay > 0.5) {
-        this.groundText.spawn('看着我', this.npc.x, this.npc.y - 30,
+        this.groundText.spawn('看着我', this.npc.x, this.npc.y - 100,
           { fontSize: 28, duration: 2500, visibleOutsideVision: true });
         this._loveSpawnedText = true;
         this._loveTextDelay = 0;
