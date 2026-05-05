@@ -22,7 +22,7 @@ const MAX_TOMBSTONES = 5;
 const GHOST_TIMER_PENALTY = 500; // ms added to failure timer if ghost explodes in vision
 
 export class Game {
-  constructor(app, texture) {
+  constructor(app, girlTex, boxTex, skullTex) {
     this.app = app;
     this.state = 'playing';
 
@@ -66,17 +66,19 @@ export class Game {
     this._setupResize();
 
     this.vision = new VisionSystem(this.app, this.layers.overlay, this.mouseX, this.mouseY, this.visionRadius);
-    this.npc = new NPC(this.app.screen.width / 2, this.app.screen.height / 2, texture);
+    this.npc = new NPC(this.app.screen.width / 2, this.app.screen.height / 2, girlTex);
     this.layers.npcLayer.addChild(this.npc.display);
 
     this.groundText = new GroundText(this.layers.groundTextLayer, this.layers.groundTextOverlay);
     this.hearts = new HeartParticles(this.layers.particleLayer);
 
-    this.itemSpawner = new ItemSpawner(this.app, this.groundText);
+    this.itemSpawner = new ItemSpawner(this.app, this.groundText, boxTex);
     this.itemEffects = new ItemEffects();
 
     this.ai = new RandomAI();
     this.jumpscare = new JumpscareManager(this.app, this.layers.jumpscareLayer, () => this.restart());
+
+    this._skullTex = skullTex;
 
     this._setupTimerDisplay();
 
@@ -412,7 +414,7 @@ export class Game {
   }
 
   _spawnGhost(x, y) {
-    const ghost = new Ghost(x, y);
+    const ghost = new Ghost(x, y, this._skullTex);
     this.ghosts.push(ghost);
     this.layers.ghostLayer.addChild(ghost.display);
   }
@@ -431,9 +433,9 @@ export class Game {
       const result = g.update(dt, this.mouseX, this.mouseY,
         this.vision.currentRadius, this.mouseX, this.mouseY);
 
-      // Ghost visible only in vision (seeking ghosts are invisible until in vision)
       const inVision = this.vision.isInVision(g.x, g.y);
-      g.setVisible(inVision || g.state === 'attacking' || g.state === 'exploding');
+      const nearPlayer = Math.hypot(g.x - this.mouseX, g.y - this.mouseY) <= 200;
+      g.setVisible(inVision || nearPlayer || g.state === 'attacking' || g.state === 'exploding');
 
       if (result && result.type === 'ghostExplode') {
         this._handleGhostExplosion(g, result);

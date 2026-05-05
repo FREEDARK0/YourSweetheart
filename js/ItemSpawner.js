@@ -16,9 +16,10 @@ const SPAWN_TEXTS = [
 ];
 
 export class ItemSpawner {
-  constructor(app, groundText) {
+  constructor(app, groundText, boxTex) {
     this.app = app;
     this.groundText = groundText;
+    this._boxTex = boxTex;
     this.items = [];
     this._timer = SPAWN_MIN + Math.random() * (SPAWN_MAX - SPAWN_MIN);
   }
@@ -44,7 +45,7 @@ export class ItemSpawner {
     if (!pos) return;
 
     const type = this._rollType();
-    const item = new Item(type, pos.x, pos.y);
+    const item = new Item(type, pos.x, pos.y, this._boxTex);
     this.items.push(item);
 
     // Spawn horror text at item position (visible outside vision)
