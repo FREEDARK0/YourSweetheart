@@ -8,6 +8,9 @@ import { ItemSpawner } from './ItemSpawner.js';
 import { ItemEffects } from './ItemEffects.js';
 import { Tombstone } from './entities/Tombstone.js';
 import { Ghost } from './entities/Ghost.js';
+import { BloodSplatter } from './effects/BloodSplatter.js';
+import { GroundRenderer } from './GroundRenderer.js';
+import { GroundLightingFilter } from './shaders/GroundLightingFilter.js';
 
 const MAX_OUT_OF_VISION_MS = 6000;
 const WARNING_THRESHOLD_MS = 2000;
@@ -58,12 +61,26 @@ export class Game {
     // Tombstones & ghosts
     this.tombstones = [];
     this.ghosts = [];
-    this.bloodSplatters = [];
     this._tombstoneTimer = TOMBSTONE_SPAWN_MIN + Math.random() * (TOMBSTONE_SPAWN_MAX - TOMBSTONE_SPAWN_MIN);
 
     this._buildLayers();
     this._setupInput();
     this._setupResize();
+
+    // 法线地砖地面
+    const { ground, normalTex } = GroundRenderer.create(this.app.screen.width, this.app.screen.height);
+    this._ground = ground;
+    this._groundNormalTex = normalTex;
+    this._groundFilter = new GroundLightingFilter(
+      this.mouseX, this.mouseY, this.visionRadius,
+      this.app.screen.width, this.app.screen.height, normalTex
+    );
+    this._ground.filters = [this._groundFilter];
+    this._ground.filterArea = new PIXI.Rectangle(0, 0, this.app.screen.width, this.app.screen.height);
+    this.layers.background.addChild(this._ground);
+
+    // 血浆粒子系统
+    this.bloodSplatter = new BloodSplatter(this.layers.bloodLayer);
 
     this.vision = new VisionSystem(this.app, this.layers.overlay, this.mouseX, this.mouseY, this.visionRadius);
     this.npc = new NPC(this.app.screen.width / 2, this.app.screen.height / 2, girlTex);
@@ -154,11 +171,11 @@ export class Game {
       this.vision.resize(w, h, keepRadius ? this.vision.currentRadius : this.visionRadius);
 
       this.layers.background.removeChildren();
-      const bg = new PIXI.Graphics();
-      bg.beginFill(0x0a0a0a);
-      bg.drawRect(0, 0, w, h);
-      bg.endFill();
-      this.layers.background.addChild(bg);
+      this._ground.width = w;
+      this._ground.height = h;
+      this.layers.background.addChild(this._ground);
+      this._groundFilter.update(this.mouseX, this.mouseY, this.vision.currentRadius, w, h);
+      this._ground.filterArea = new PIXI.Rectangle(0, 0, w, h);
     });
   }
 
@@ -263,8 +280,13 @@ export class Game {
     this.vision.update(this.mouseX, this.mouseY);
 
     // --- Effects ---
+    this.bloodSplatter.update(dt);
     this.groundText.update(dtMs);
     this.hearts.update(dtMs);
+
+    // --- 更新地面光照 filter ---
+    this._groundFilter.update(this.mouseX, this.mouseY, this.vision.currentRadius,
+      this.app.screen.width, this.app.screen.height);
 
     // --- NPC visibility & timer ---
     const npcInVision = this.npc.isInVision(this.vision);
@@ -434,7 +456,7 @@ export class Game {
         this.vision.currentRadius, this.mouseX, this.mouseY);
 
       const inVision = this.vision.isInVision(g.x, g.y);
-      const nearPlayer = Math.hypot(g.x - this.mouseX, g.y - this.mouseY) <= 200;
+      const nearPlayer = Math.hypot(g.x - this.mouseX, g.y - this.mouseY) <= 150;
       g.setVisible(inVision || nearPlayer || g.state === 'attacking' || g.state === 'exploding');
 
       if (result && result.type === 'ghostExplode') {
@@ -444,30 +466,12 @@ export class Game {
   }
 
   _handleGhostExplosion(ghost, result) {
-    // Blood splatter
-    const splatter = new PIXI.Graphics();
-    for (let i = 0; i < 5; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const dist = 10 + Math.random() * 25;
-      const sx = ghost.x + Math.cos(angle) * dist;
-      const sy = ghost.y + Math.sin(angle) * dist;
-      splatter.beginFill(0x990000, 0.7);
-      splatter.drawEllipse(sx, sy, 4 + Math.random() * 6, 2 + Math.random() * 4);
-      splatter.endFill();
-    }
-    // Central pool
-    splatter.beginFill(0x770000, 0.5);
-    splatter.drawEllipse(ghost.x, ghost.y, 14, 8);
-    splatter.endFill();
-    this.layers.bloodLayer.addChild(splatter);
-    this.bloodSplatters.push(splatter);
+    this.bloodSplatter.emit(ghost.x, ghost.y);
 
-    // Penalty if explosion happened in vision
     if (result.inVision) {
       this.outOfVisionTimer += GHOST_TIMER_PENALTY;
     }
 
-    // Remove ghost
     ghost.state = 'dead';
   }
 
@@ -612,11 +616,10 @@ export class Game {
     // Reset tombstones & ghosts
     this.tombstones = [];
     this.ghosts = [];
-    this.bloodSplatters = [];
     this._tombstoneTimer = TOMBSTONE_SPAWN_MIN + Math.random() * (TOMBSTONE_SPAWN_MAX - TOMBSTONE_SPAWN_MIN);
     this.layers.tombstoneLayer.removeChildren();
     this.layers.ghostLayer.removeChildren();
-    this.layers.bloodLayer.removeChildren();
+    this.bloodSplatter.clear();
 
     // Reset texts & particles
     this.groundText.clear();

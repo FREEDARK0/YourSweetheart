@@ -1,75 +1,77 @@
+import { LightingFilter } from './shaders/LightingFilter.js';
+
 /**
- * 手电筒视野系统 — 全屏暗黑遮罩 + 圆形挖孔（hole-punch）跟随鼠标。
- * 支持动态半径（示爱阶段缩小）和辉光环颜色切换。
+ * 手电筒视野系统 — 使用自定义 GLSL Shader 实现软边光照衰减。
+ * 替换了旧的 Graphics beginHole/endHole 硬边挖孔。
  */
 export class VisionSystem {
   constructor(app, overlayContainer, x, y, radius) {
     this.app = app;
     this.container = overlayContainer;
-    this.radius = radius;       // base normal radius
-    this.currentRadius = radius; // actual displayed radius (interpolated)
-    this.targetRadius = radius;  // target to interpolate toward
+    this.radius = radius;
+    this.currentRadius = radius;
+    this.targetRadius = radius;
     this.x = x;
     this.y = y;
 
-    // Glow color
     this._glowColor = 0x333333;
     this._glowAlpha = 0.25;
 
-    // Dark overlay with a circular hole
+    const w = app.screen.width;
+    const h = app.screen.height;
+
+    // 全屏黑色遮罩
     this.darkness = new PIXI.Graphics();
-    this.container.addChild(this.darkness);
-
-    // Soft-edge glow ring (drawn separately on top)
-    this.glowRing = new PIXI.Graphics();
-    this.container.addChild(this.glowRing);
-
-    this._redraw(app.screen.width, app.screen.height);
-  }
-
-  _redraw(w, h) {
-    const r = this.currentRadius;
-    // Extend rect beyond canvas so the hole is always fully contained
-    const pad = r + 100;
-    const x0 = -pad;
-    const y0 = -pad;
-    const ww = w + pad * 2;
-    const hh = h + pad * 2;
-
-    // Darkness: oversized black rect with a circular hole
-    this.darkness.clear();
     this.darkness.beginFill(0x000000, 0.97);
-    this.darkness.drawRect(x0, y0, ww, hh);
-    this.darkness.beginHole();
-    this.darkness.drawCircle(this.x, this.y, r);
-    this.darkness.endHole();
+    this.darkness.drawRect(0, 0, w, h);
     this.darkness.endFill();
 
-    // Glow at hole edge
-    this.glowRing.clear();
-    this.glowRing.lineStyle(2, this._glowColor, this._glowAlpha);
-    this.glowRing.drawCircle(this.x, this.y, r);
-    this.glowRing.lineStyle(1, this._glowColor, this._glowAlpha * 0.5);
-    this.glowRing.drawCircle(this.x, this.y, r + 3);
+    // 应用 shader 光照过滤器
+    this.filter = new LightingFilter(x, y, radius, w, h);
+    this.darkness.filters = [this.filter];
+    this.darkness.filterArea = new PIXI.Rectangle(0, 0, w, h);
+
+    this.container.addChild(this.darkness);
+
+    // 软辉光环（保留 Graphics 绘制，叠加在 shader 之上）
+    this.glowRing = new PIXI.Graphics();
+    this.container.addChild(this.glowRing);
   }
 
   update(x, y) {
     this.x = x;
     this.y = y;
-    // Smoothly interpolate current radius toward target
+
     this.currentRadius += (this.targetRadius - this.currentRadius) * 0.08;
     if (Math.abs(this.targetRadius - this.currentRadius) < 0.5) {
       this.currentRadius = this.targetRadius;
     }
     this.radius = this.currentRadius;
-    this._redraw(this.app.screen.width, this.app.screen.height);
+
+    const w = this.app.screen.width;
+    const h = this.app.screen.height;
+
+    // 更新 shader uniform
+    this.filter.update(x, y, this.currentRadius, w, h);
+
+    // 辉光环
+    this.glowRing.clear();
+    this.glowRing.lineStyle(2, this._glowColor, this._glowAlpha);
+    this.glowRing.drawCircle(x, y, this.currentRadius);
+    this.glowRing.lineStyle(1, this._glowColor, this._glowAlpha * 0.5);
+    this.glowRing.drawCircle(x, y, this.currentRadius + 3);
   }
 
   resize(w, h, radius) {
     this.radius = radius;
     this.targetRadius = radius;
     this.currentRadius = radius;
-    this._redraw(w, h);
+    this.darkness.clear();
+    this.darkness.beginFill(0x000000, 0.97);
+    this.darkness.drawRect(0, 0, w, h);
+    this.darkness.endFill();
+    this.darkness.filterArea = new PIXI.Rectangle(0, 0, w, h);
+    this.filter.update(this.x, this.y, radius, w, h);
   }
 
   reset() {
@@ -77,26 +79,28 @@ export class VisionSystem {
     this.targetRadius = this.radius;
     this._glowColor = 0x333333;
     this._glowAlpha = 0.25;
-    this._redraw(this.app.screen.width, this.app.screen.height);
+    // 恢复环境光为默认值
+    this.filter.uniforms.uAmbient = 0.03;
   }
 
-  /** Set target radius — current radius smoothly interpolates toward it. */
   setTargetRadius(r) {
     this.targetRadius = r;
   }
 
-  /** Immediately set radius (no interpolation). */
   setRadius(r) {
     this.radius = r;
     this.currentRadius = r;
     this.targetRadius = r;
-    this._redraw(this.app.screen.width, this.app.screen.height);
+    const w = this.app.screen.width;
+    const h = this.app.screen.height;
+    this.filter.update(this.x, this.y, r, w, h);
   }
 
-  /** Set glow ring color. */
   setGlowColor(color, alpha) {
     this._glowColor = color;
     this._glowAlpha = alpha;
+    // love 状态时微微提高环境光
+    this.filter.uniforms.uAmbient = alpha > 0.3 ? 0.08 : 0.03;
   }
 
   isInVision(x, y) {
