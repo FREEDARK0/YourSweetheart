@@ -5,18 +5,15 @@ const fragSrc = `
   uniform vec2 uLightPos;
   uniform float uLightRadius;
   uniform vec2 uInputSize;
-  uniform float uAmbient;
 
   void main() {
-    vec4 texColor = texture2D(uSampler, vTextureCoord);
     vec2 pixelCoord = vTextureCoord * uInputSize;
     float dist = length(pixelCoord - uLightPos);
-    float t = smoothstep(uLightRadius, uLightRadius * 0.3, dist);
-    float light = uAmbient + (1.0 - uAmbient) * (1.0 - t);
-    // subtle rim glow at light edge
-    float glow = smoothstep(uLightRadius * 0.85, uLightRadius * 1.08, dist) * 0.10;
-    light = min(1.0, light + glow);
-    gl_FragColor = texColor * vec4(light, light, light, 1.0);
+    float t = smoothstep(uLightRadius, uLightRadius * 0.25, dist);
+    // subtle glow ring at the light edge
+    float glow = smoothstep(uLightRadius * 0.85, uLightRadius * 1.05, dist) * 0.08;
+    float alpha = max(t, glow);
+    gl_FragColor = vec4(0.0, 0.0, 0.0, alpha);
   }
 `;
 
@@ -26,7 +23,6 @@ export class LightingFilter extends PIXI.Filter {
       uLightPos:   new Float32Array([lightX, lightY]),
       uLightRadius: radius,
       uInputSize:  new Float32Array([screenW, screenH]),
-      uAmbient:    0.03,
     });
   }
 

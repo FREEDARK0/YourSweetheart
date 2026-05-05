@@ -79,8 +79,6 @@ export class VisionSystem {
     this.targetRadius = this.radius;
     this._glowColor = 0x333333;
     this._glowAlpha = 0.25;
-    // 恢复环境光为默认值
-    this.filter.uniforms.uAmbient = 0.03;
   }
 
   setTargetRadius(r) {
@@ -99,8 +97,6 @@ export class VisionSystem {
   setGlowColor(color, alpha) {
     this._glowColor = color;
     this._glowAlpha = alpha;
-    // love 状态时微微提高环境光
-    this.filter.uniforms.uAmbient = alpha > 0.3 ? 0.08 : 0.03;
   }
 
   isInVision(x, y) {
