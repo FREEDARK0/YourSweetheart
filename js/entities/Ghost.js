@@ -1,6 +1,8 @@
-const GHOST_SPEED = 70; // px/s seeking speed
-const ATTACK_DURATION = 0.6; // seconds from entering vision to explosion
-const EXPLOSION_RADIUS = 40;
+const GHOST_SPEED = 70;
+const ATTACK_DURATION = 0.6;
+const TRAIL_LENGTH = 14;       // number of trail positions
+const WISP_COUNT = 6;          // will-o'-wisp particles
+const WISP_RADIUS = 16;        // orbit radius around skull
 
 export class Ghost {
   constructor(x, y) {
@@ -8,49 +10,122 @@ export class Ghost {
     this.y = y;
     this.state = 'seeking'; // 'seeking' | 'attacking' | 'exploding' | 'dead'
     this.attackTimer = 0;
-    this._shakePhase = Math.random() * Math.PI * 2;
+    this._phase = Math.random() * Math.PI * 2;
+
+    // Trail history
+    this._trail = [];
+    for (let i = 0; i < TRAIL_LENGTH; i++) {
+      this._trail.push({ x, y });
+    }
+
+    // Will-o'-wisp particles
+    this._wisps = [];
+    for (let i = 0; i < WISP_COUNT; i++) {
+      this._wisps.push({
+        angle: (i / WISP_COUNT) * Math.PI * 2 + Math.random() * 0.5,
+        speed: 1.5 + Math.random() * 2,
+        radius: WISP_RADIUS * (0.6 + Math.random() * 0.4),
+        size: 2 + Math.random() * 3,
+      });
+    }
 
     this.display = new PIXI.Container();
-    this.display.x = x;
-    this.display.y = y;
+    // Trail gfx (rendered first so it's behind)
+    this.trailGfx = new PIXI.Graphics();
+    this.display.addChild(this.trailGfx);
+    // Main skull gfx
+    this.skullGfx = new PIXI.Graphics();
+    this.display.addChild(this.skullGfx);
+    // Wisp gfx
+    this.wispGfx = new PIXI.Graphics();
+    this.display.addChild(this.wispGfx);
 
-    this.gfx = new PIXI.Graphics();
-    this.display.addChild(this.gfx);
-    this._drawGhost(0xccccff, 0.5);
+    this._color = 0x4488aa; // base teal-blue
+    this._drawSkull(this._color, 0.7);
+    this._drawWisps(0x44ccaa);
   }
 
-  _drawGhost(color, alpha) {
-    const g = this.gfx;
+  // ---- Drawing ----
+
+  _drawSkull(color, alpha) {
+    const g = this.skullGfx;
     g.clear();
+    const s = 9; // base scale
 
-    // Body — wispy oval
+    // Cranium
     g.beginFill(color, alpha);
-    g.drawEllipse(0, 0, 10, 14);
+    g.drawEllipse(0, -1, s * 0.9, s * 1.0);
     g.endFill();
 
-    // Head
-    g.beginFill(color, alpha * 1.2);
-    g.drawCircle(0, -10, 6);
-    g.endFill();
-
-    // Eyes — dark pits
-    g.beginFill(0x000000, alpha);
-    g.drawCircle(-2.5, -11, 1.5);
-    g.drawCircle(2.5, -11, 1.5);
-    g.endFill();
-
-    // Wispy tail
-    g.beginFill(color, alpha * 0.6);
-    g.moveTo(-6, 8);
-    g.lineTo(-8, 16);
-    g.lineTo(-2, 14);
-    g.lineTo(2, 18);
-    g.lineTo(6, 14);
-    g.lineTo(10, 16);
-    g.lineTo(8, 8);
+    // Cheekbones / jaw
+    g.beginFill(color, alpha * 0.9);
+    g.moveTo(-s * 0.75, -2);
+    g.lineTo(-s * 0.6, s * 0.1);
+    g.lineTo(-s * 0.4, s * 0.6);
+    g.lineTo(-s * 0.15, s * 0.4);
+    g.lineTo(0, s * 0.7);
+    g.lineTo(s * 0.15, s * 0.4);
+    g.lineTo(s * 0.4, s * 0.6);
+    g.lineTo(s * 0.6, s * 0.1);
+    g.lineTo(s * 0.75, -2);
     g.closePath();
     g.endFill();
+
+    // Left eye socket
+    g.beginFill(0x000000, alpha);
+    g.drawEllipse(-s * 0.3, -s * 0.15, s * 0.25, s * 0.3);
+    g.endFill();
+    // Right eye socket
+    g.drawEllipse(s * 0.3, -s * 0.15, s * 0.25, s * 0.3);
+    g.endFill();
+
+    // Nose hole
+    g.beginFill(0x000000, alpha * 0.8);
+    g.drawEllipse(0, s * 0.05, s * 0.12, s * 0.15);
+    g.endFill();
+
+    // Teeth lines
+    g.lineStyle(0.5, 0x000000, alpha * 0.4);
+    for (let i = -2; i <= 2; i++) {
+      g.moveTo(i * s * 0.12, s * 0.38);
+      g.lineTo(i * s * 0.12, s * 0.6);
+    }
+    g.lineStyle(0);
   }
+
+  _drawWisps(color) {
+    const g = this.wispGfx;
+    g.clear();
+    for (const w of this._wisps) {
+      const wx = Math.cos(w.angle) * w.radius;
+      const wy = Math.sin(w.angle) * w.radius * 0.7;
+      // Soft glow
+      g.beginFill(color, 0.15);
+      g.drawCircle(wx, wy, w.size * 2.5);
+      g.endFill();
+      // Core
+      g.beginFill(color, 0.55);
+      g.drawCircle(wx, wy, w.size);
+      g.endFill();
+    }
+  }
+
+  _drawTrail(color) {
+    const g = this.trailGfx;
+    g.clear();
+    const len = this._trail.length;
+    for (let i = 0; i < len; i++) {
+      const t = this._trail[i];
+      const progress = 1 - i / len; // 1 (newest) → 0 (oldest)
+      const alpha = progress * 0.25;
+      const radius = progress * 5;
+      g.beginFill(color, alpha);
+      g.drawCircle(t.x - this.x, t.y - this.y, radius);
+      g.endFill();
+    }
+  }
+
+  // ---- Update ----
 
   update(dt, playerX, playerY, visionRadius, visionX, visionY) {
     if (this.state === 'dead') return null;
@@ -66,40 +141,57 @@ export class Ghost {
         this.x += (dx / dist) * GHOST_SPEED * dt;
         this.y += (dy / dist) * GHOST_SPEED * dt;
       }
-      this.display.x = this.x;
-      this.display.y = this.y;
 
-      // Gentle float
-      this.display.y += Math.sin(this._shakePhase) * 0.3;
-      this._shakePhase += dt * 2;
+      // Update wisps
+      this._phase += dt * 3;
+      for (const w of this._wisps) {
+        w.angle += w.speed * dt;
+      }
+
+      this._drawSkull(this._color, 0.7);
+      this._drawWisps(0x44ccaa);
 
       if (inVision) {
         this.state = 'attacking';
         this.attackTimer = 0;
       }
 
+      this._updateTrail();
+      this._drawTrail(0x44ccaa);
+      this.display.x = this.x;
+      this.display.y = this.y;
       return null;
     }
 
     if (this.state === 'attacking') {
       this.attackTimer += dt;
-      const t = this.attackTimer / ATTACK_DURATION;
+      const t = Math.min(1, this.attackTimer / ATTACK_DURATION); // CLAMPED
 
-      // Turn red progressively
-      const red = Math.floor(0xcc + t * 0x33);
-      const green = Math.floor(0xcc * (1 - t));
-      const blue = Math.floor(0xff * (1 - t * 0.8));
-      const color = (red << 16) | (green << 8) | blue;
-      this._drawGhost(color, 0.5 + t * 0.4);
+      // Color from teal → blood red
+      const r = Math.floor(0x44 + t * (0xcc - 0x44));
+      const g = Math.floor(0x88 * (1 - t));
+      const b = Math.floor(0xaa * (1 - t));
+      const color = (r << 16) | (g << 8) | b;
+      this._color = color;
 
-      // Shake erratically
-      const shakeAmp = t * 8;
-      this.display.x = this.x + (Math.random() - 0.5) * shakeAmp;
-      this.display.y = this.y + (Math.random() - 0.5) * shakeAmp;
+      this._drawSkull(color, 0.7 + t * 0.25);
+      this._drawWisps(0xff4444);
+
+      // Shake
+      const shakeAmp = t * 7;
+      const sx = this.x + (Math.random() - 0.5) * shakeAmp;
+      const sy = this.y + (Math.random() - 0.5) * shakeAmp;
+      this.display.x = sx;
+      this.display.y = sy;
 
       // Grow
-      const scale = 1 + t * 2.5;
+      const scale = 1 + t * 2.2;
       this.display.scale.set(scale);
+
+      this._phase += dt * 8;
+
+      this._updateTrail();
+      this._drawTrail(0xff4444);
 
       if (this.attackTimer >= ATTACK_DURATION) {
         this.state = 'exploding';
@@ -110,6 +202,13 @@ export class Ghost {
     }
 
     return null;
+  }
+
+  _updateTrail() {
+    this._trail.unshift({ x: this.x, y: this.y });
+    if (this._trail.length > TRAIL_LENGTH) {
+      this._trail.pop();
+    }
   }
 
   _isInVision(vx, vy, vr) {
