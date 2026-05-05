@@ -22,7 +22,7 @@ const MAX_TOMBSTONES = 5;
 const GHOST_TIMER_PENALTY = 500; // ms added to failure timer if ghost explodes in vision
 
 export class Game {
-  constructor(app, textures) {
+  constructor(app, texture) {
     this.app = app;
     this.state = 'playing';
 
@@ -66,7 +66,7 @@ export class Game {
     this._setupResize();
 
     this.vision = new VisionSystem(this.app, this.layers.overlay, this.mouseX, this.mouseY, this.visionRadius);
-    this.npc = new NPC(this.app.screen.width / 2, this.app.screen.height / 2, textures);
+    this.npc = new NPC(this.app.screen.width / 2, this.app.screen.height / 2, texture);
     this.layers.npcLayer.addChild(this.npc.display);
 
     this.groundText = new GroundText(this.layers.groundTextLayer, this.layers.groundTextOverlay);

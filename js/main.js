@@ -12,12 +12,7 @@ import { Game } from './Game.js';
 
   document.body.appendChild(app.view);
 
-  const [idle, moveDown, moveRight, moveUp] = await Promise.all([
-    PIXI.Assets.load('assets/girl_idle.png'),
-    PIXI.Assets.load('assets/girl_move_down.png'),
-    PIXI.Assets.load('assets/girl_move_right.png'),
-    PIXI.Assets.load('assets/girl_move_up.png'),
-  ]);
+  const texture = await PIXI.Assets.load('assets/girl.png');
 
-  new Game(app, { idle, moveDown, moveRight, moveUp });
+  new Game(app, texture);
 })();

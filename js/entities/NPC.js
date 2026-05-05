@@ -1,9 +1,10 @@
-const ANIM_FPS = 6;
-const FRAME_TIME = 1 / ANIM_FPS;
-const TARGET_HEIGHT = 96;
+const TARGET_WIDTH = 128;
+const BOB_AMPLITUDE = 5;
+const BOB_FREQ = 9;      // oscillations per second while moving
+const BOB_RETURN = 6;    // lerp speed when returning to center
 
 export class NPC {
-  constructor(x, y, textures) {
+  constructor(x, y, texture) {
     this.x = x;
     this.y = y;
     this.speed = 120;
@@ -11,15 +12,13 @@ export class NPC {
 
     this._direction = 'down';
     this._moving = false;
-    this._animTimer = 0;
-    this._animFrame = 0;
+    this._bobTime = 0;
+    this._bobOffset = 0;
 
-    this._frames = this._buildFrames(textures);
-
-    this.sprite = new PIXI.Sprite(this._frames.idle[0]);
+    this.sprite = new PIXI.Sprite(texture);
     this.sprite.anchor.set(0.5, 0.85);
 
-    const scale = TARGET_HEIGHT / textures.idle.height;
+    const scale = TARGET_WIDTH / texture.width;
     this.sprite.scale.set(scale);
 
     this.display = new PIXI.Container();
@@ -28,41 +27,13 @@ export class NPC {
     this.display.addChild(this.sprite);
   }
 
-  _buildFrames(textures) {
-    const frames = {
-      idle: [textures.idle],
-      down: [],
-      up: [],
-      right: [],
-    };
-
-    for (const [key, tex] of [
-      ['down', textures.moveDown],
-      ['up', textures.moveUp],
-      ['right', textures.moveRight],
-    ]) {
-      const bw = tex.baseTexture.width;
-      const bh = tex.baseTexture.height;
-      const fw = bw / 3;
-      for (let i = 0; i < 3; i++) {
-        frames[key].push(
-          new PIXI.Texture(tex.baseTexture, new PIXI.Rectangle(i * fw, 0, fw, bh))
-        );
-      }
-    }
-
-    return frames;
-  }
-
   updateAnimation(dt, dx, dy) {
     const speed = Math.sqrt(dx * dx + dy * dy);
 
     if (speed < 0.5) {
       this._moving = false;
-      this._animFrame = 0;
-      this._animTimer = 0;
-      this.sprite.texture = this._frames.idle[0];
-      this.sprite.scale.x = Math.abs(this.sprite.scale.x);
+      this._bobOffset += (0 - this._bobOffset) * Math.min(1, BOB_RETURN * dt);
+      this._bobTime = 0;
     } else {
       this._moving = true;
 
@@ -74,22 +45,15 @@ export class NPC {
 
       if (this._direction === 'left') {
         this.sprite.scale.x = -Math.abs(this.sprite.scale.x);
-        this._advanceAnim(dt, 'right');
       } else {
         this.sprite.scale.x = Math.abs(this.sprite.scale.x);
-        this._advanceAnim(dt, this._direction);
       }
-    }
-  }
 
-  _advanceAnim(dt, key) {
-    this._animTimer += dt;
-    const frames = this._frames[key];
-    while (this._animTimer >= FRAME_TIME) {
-      this._animTimer -= FRAME_TIME;
-      this._animFrame = (this._animFrame + 1) % frames.length;
+      this._bobTime += dt;
+      this._bobOffset = Math.sin(this._bobTime * BOB_FREQ * Math.PI * 2) * BOB_AMPLITUDE;
     }
-    this.sprite.texture = frames[this._animFrame];
+
+    this.sprite.y = this._bobOffset;
   }
 
   setVisible(v) {
