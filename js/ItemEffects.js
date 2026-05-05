@@ -46,6 +46,14 @@ export class ItemEffects {
     const clampedX = Math.max(30, Math.min(app.screen.width - 30, tx));
     const clampedY = Math.max(30, Math.min(app.screen.height - 30, ty));
 
+    // Small chance (~8%) to spawn a ghost instead of an item
+    if (Math.random() < 0.08) {
+      if (game._spawnGhost) {
+        game._spawnGhost(boxItem.x, boxItem.y);
+      }
+      return;
+    }
+
     // Choose new item type (low chance for another box)
     let newType;
     const roll = Math.random();
@@ -121,11 +129,10 @@ export class ItemEffects {
     const { game } = ctx;
     game._visionDrift = {
       timer: 2.0,
+      driftAngle: Math.random() * Math.PI * 2,
+      driftRadius: 130 + Math.random() * 50, // large orbit radius
       driftX: 0,
       driftY: 0,
-      targetDriftX: 0,
-      targetDriftY: 0,
-      changeTimer: 0,
     };
   }
 
@@ -180,23 +187,14 @@ export class ItemEffects {
       }
     }
 
-    // Update vision drift
+    // Update vision drift (bottle effect)
     if (game._visionDrift) {
       game._visionDrift.timer -= dt;
-      game._visionDrift.changeTimer -= dt;
-
-      if (game._visionDrift.changeTimer <= 0) {
-        game._visionDrift.changeTimer = 0.3 + Math.random() * 0.5;
-        const mag = 40 + Math.random() * 60;
-        const angle = Math.random() * Math.PI * 2;
-        game._visionDrift.targetDriftX = Math.cos(angle) * mag;
-        game._visionDrift.targetDriftY = Math.sin(angle) * mag;
-      }
-
-      // Smooth drift
-      const lerp = 0.06;
-      game._visionDrift.driftX += (game._visionDrift.targetDriftX - game._visionDrift.driftX) * lerp;
-      game._visionDrift.driftY += (game._visionDrift.targetDriftY - game._visionDrift.driftY) * lerp;
+      // Drift angle changes smoothly, creating an orbiting pull around the mouse
+      game._visionDrift.driftAngle += (Math.random() - 0.5) * 2.0 * dt;
+      const r = game._visionDrift.driftRadius;
+      game._visionDrift.driftX = Math.cos(game._visionDrift.driftAngle) * r;
+      game._visionDrift.driftY = Math.sin(game._visionDrift.driftAngle) * r;
 
       if (game._visionDrift.timer <= 0) {
         game._visionDrift = null;

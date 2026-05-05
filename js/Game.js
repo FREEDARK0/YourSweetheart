@@ -6,14 +6,20 @@ import { GroundText } from './effects/GroundText.js';
 import { HeartParticles } from './effects/HeartParticles.js';
 import { ItemSpawner } from './ItemSpawner.js';
 import { ItemEffects } from './ItemEffects.js';
+import { Tombstone } from './entities/Tombstone.js';
+import { Ghost } from './entities/Ghost.js';
 
-const MAX_OUT_OF_VISION_MS = 6000;  // 6 seconds initial
-const WARNING_THRESHOLD_MS = 2000;  // flicker when < 2s remaining
+const MAX_OUT_OF_VISION_MS = 6000;
+const WARNING_THRESHOLD_MS = 2000;
 const VISION_RADIUS_RATIO = 0.18;
 const VISION_RADIUS_MIN = 100;
 const LOVE_MIN_RADIUS = 35;
 const LOVE_SLOWDOWN = 0.7;
 const POST_LOVE_HOLD = 3.0;
+const TOMBSTONE_SPAWN_MIN = 3; // seconds
+const TOMBSTONE_SPAWN_MAX = 5;
+const MAX_TOMBSTONES = 5;
+const GHOST_TIMER_PENALTY = 500; // ms added to failure timer if ghost explodes in vision
 
 export class Game {
   constructor(app) {
@@ -49,6 +55,12 @@ export class Game {
     this._visionDrift = null;
     this._flyingItems = [];
 
+    // Tombstones & ghosts
+    this.tombstones = [];
+    this.ghosts = [];
+    this.bloodSplatters = [];
+    this._tombstoneTimer = TOMBSTONE_SPAWN_MIN + Math.random() * (TOMBSTONE_SPAWN_MAX - TOMBSTONE_SPAWN_MIN);
+
     this._buildLayers();
     this._setupInput();
     this._setupResize();
@@ -77,6 +89,9 @@ export class Game {
     this.layers = {};
     this.layers.background = new PIXI.Container();
     this.layers.groundTextLayer = new PIXI.Container();
+    this.layers.bloodLayer = new PIXI.Container();
+    this.layers.tombstoneLayer = new PIXI.Container();
+    this.layers.ghostLayer = new PIXI.Container();
     this.layers.itemLayer = new PIXI.Container();
     this.layers.npcLayer = new PIXI.Container();
     this.layers.particleLayer = new PIXI.Container();
@@ -92,7 +107,10 @@ export class Game {
     this.layers.background.addChild(bg);
 
     this.app.stage.addChild(this.layers.background);
+    this.app.stage.addChild(this.layers.bloodLayer);
     this.app.stage.addChild(this.layers.groundTextLayer);
+    this.app.stage.addChild(this.layers.tombstoneLayer);
+    this.app.stage.addChild(this.layers.ghostLayer);
     this.app.stage.addChild(this.layers.itemLayer);
     this.app.stage.addChild(this.layers.npcLayer);
     this.app.stage.addChild(this.layers.particleLayer);
@@ -198,6 +216,12 @@ export class Game {
     // --- Item effects ---
     this.itemEffects.update(dt, this);
 
+    // --- Tombstone spawning ---
+    this._updateTombstones(dt, dtMs);
+
+    // --- Ghost updates ---
+    this._updateGhosts(dt);
+
     // --- Gather nearest item positions for AI ---
     const items = this.itemSpawner.getItems();
     const itemPositions = items.map(i => ({ x: i.x, y: i.y, type: i.type }));
@@ -285,7 +309,7 @@ export class Game {
     // Bottle drift
     let lerpSpeed = 1.0; // instant by default
     if (this._visionDrift) {
-      lerpSpeed = 0.12; // heavy delay
+      lerpSpeed = 0.18; // moderate delay, less pull than before
       targetX += this._visionDrift.driftX;
       targetY += this._visionDrift.driftY;
     }
@@ -326,9 +350,121 @@ export class Game {
     }
   }
 
-  // ---- Love state ----
+  // ---- Tombstones ----
 
-  _handleLoveState(dt, dtMs) {
+  _updateTombstones(dt, dtMs) {
+    // Spawning
+    this._tombstoneTimer -= dt;
+    if (this._tombstoneTimer <= 0 && this.tombstones.length < MAX_TOMBSTONES) {
+      this._tombstoneTimer = TOMBSTONE_SPAWN_MIN + Math.random() * (TOMBSTONE_SPAWN_MAX - TOMBSTONE_SPAWN_MIN);
+      const pos = this._findTombstonePos();
+      if (pos) {
+        const t = new Tombstone(pos.x, pos.y);
+        this.tombstones.push(t);
+        this.layers.tombstoneLayer.addChild(t.display);
+        this.groundText.spawn('安息吧', pos.x, pos.y + 10,
+          { fontSize: 18, duration: 1800, visibleOutsideVision: true });
+      }
+    }
+
+    // Update existing tombstones
+    for (let i = this.tombstones.length - 1; i >= 0; i--) {
+      const t = this.tombstones[i];
+      if (!t.active) continue;
+
+      const inVision = this.vision.isInVision(t.x, t.y);
+      t.setVisible(inVision);
+
+      const result = t.update(dt, inVision);
+      if (result === 'activate') {
+        // Remove tombstone, spawn ghost
+        if (t.display.parent) t.display.parent.removeChild(t.display);
+        this.tombstones.splice(i, 1);
+        this._spawnGhost(t.x, t.y);
+      }
+    }
+  }
+
+  _findTombstonePos() {
+    const w = this.app.screen.width;
+    const h = this.app.screen.height;
+    const m = 40;
+    for (let i = 0; i < 25; i++) {
+      const x = m + Math.random() * (w - m * 2);
+      const y = m + Math.random() * (h - m * 2);
+      const dvx = x - this.mouseX;
+      const dvy = y - this.mouseY;
+      if (Math.sqrt(dvx * dvx + dvy * dvy) < this.vision.currentRadius + 30) continue;
+      let tooClose = false;
+      for (const t of this.tombstones) {
+        const dx = x - t.x;
+        const dy = y - t.y;
+        if (Math.sqrt(dx * dx + dy * dy) < 70) { tooClose = true; break; }
+      }
+      if (!tooClose) return { x, y };
+    }
+    return null;
+  }
+
+  _spawnGhost(x, y) {
+    const ghost = new Ghost(x, y);
+    this.ghosts.push(ghost);
+    this.layers.ghostLayer.addChild(ghost.display);
+  }
+
+  // ---- Ghosts ----
+
+  _updateGhosts(dt) {
+    for (let i = this.ghosts.length - 1; i >= 0; i--) {
+      const g = this.ghosts[i];
+      if (g.state === 'dead') {
+        if (g.display.parent) g.display.parent.removeChild(g.display);
+        this.ghosts.splice(i, 1);
+        continue;
+      }
+
+      const result = g.update(dt, this.mouseX, this.mouseY,
+        this.vision.currentRadius, this.mouseX, this.mouseY);
+
+      // Ghost visible only in vision (seeking ghosts are invisible until in vision)
+      const inVision = this.vision.isInVision(g.x, g.y);
+      g.setVisible(inVision || g.state === 'attacking' || g.state === 'exploding');
+
+      if (result && result.type === 'ghostExplode') {
+        this._handleGhostExplosion(g, result);
+      }
+    }
+  }
+
+  _handleGhostExplosion(ghost, result) {
+    // Blood splatter
+    const splatter = new PIXI.Graphics();
+    for (let i = 0; i < 5; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 10 + Math.random() * 25;
+      const sx = ghost.x + Math.cos(angle) * dist;
+      const sy = ghost.y + Math.sin(angle) * dist;
+      splatter.beginFill(0x990000, 0.7);
+      splatter.drawEllipse(sx, sy, 4 + Math.random() * 6, 2 + Math.random() * 4);
+      splatter.endFill();
+    }
+    // Central pool
+    splatter.beginFill(0x770000, 0.5);
+    splatter.drawEllipse(ghost.x, ghost.y, 14, 8);
+    splatter.endFill();
+    this.layers.bloodLayer.addChild(splatter);
+    this.bloodSplatters.push(splatter);
+
+    // Penalty if explosion happened in vision
+    if (result.inVision) {
+      this.outOfVisionTimer += GHOST_TIMER_PENALTY;
+    }
+
+    // Remove ghost
+    ghost.state = 'dead';
+  }
+
+  // ---- Love state ----
     if (this.npc._loveJustStarted) {
       this.npc._loveJustStarted = false;
       this._inLove = true;
@@ -462,8 +598,16 @@ export class Game {
 
     // Reset items
     this.itemSpawner.clear();
-    // Remove item displays
     this.layers.itemLayer.removeChildren();
+
+    // Reset tombstones & ghosts
+    this.tombstones = [];
+    this.ghosts = [];
+    this.bloodSplatters = [];
+    this._tombstoneTimer = TOMBSTONE_SPAWN_MIN + Math.random() * (TOMBSTONE_SPAWN_MAX - TOMBSTONE_SPAWN_MIN);
+    this.layers.tombstoneLayer.removeChildren();
+    this.layers.ghostLayer.removeChildren();
+    this.layers.bloodLayer.removeChildren();
 
     // Reset texts & particles
     this.groundText.clear();
