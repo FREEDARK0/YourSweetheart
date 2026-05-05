@@ -465,6 +465,8 @@ export class Game {
   }
 
   // ---- Love state ----
+
+  _handleLoveState(dt, dtMs) {
     if (this.npc._loveJustStarted) {
       this.npc._loveJustStarted = false;
       this._inLove = true;
