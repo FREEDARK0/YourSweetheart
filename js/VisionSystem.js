@@ -85,6 +85,11 @@ export class VisionSystem {
     this.darkness = this._createMesh(w, h);
     this.container.addChild(this.darkness);
 
+    // TEST: candle at screen center with large radius — verifies uniform upload
+    this._testCandle = true;
+    this._shader.uniforms.uC0Pos = new Float32Array([w / 2, h / 2]);
+    this._shader.uniforms.uC0Radius = 180;
+
     this.glowRing = new PIXI.Graphics();
     this.container.addChild(this.glowRing);
   }
@@ -97,11 +102,11 @@ export class VisionSystem {
   }
 
   setCandles(candleList) {
+    if (this._testCandle) return; // preserve test candle
     const count = Math.min(candleList.length, MAX_CANDLES);
     for (let i = 0; i < MAX_CANDLES; i++) {
       if (i < count) {
         const c = candleList[i];
-        // Create NEW array each time — PixiJS uses reference (!==) to detect changes
         this._shader.uniforms[`uC${i}Pos`] = new Float32Array([c.x, c.y]);
         this._shader.uniforms[`uC${i}Radius`] = Math.max(c.currentRadius, 0.001);
       } else {
