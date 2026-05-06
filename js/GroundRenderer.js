@@ -1,21 +1,21 @@
 const TILE_SIZE = 256;
-const GRID = 4;          // 4×4 checkerboard squares
-const CELL = TILE_SIZE / GRID; // 64px per cell
-const GAP = 3;           // mortar gap between tiles
+const GRID = 8;          // 8×8 square tiles
+const CELL = TILE_SIZE / GRID; // 32px per tile
+const GAP = 1;           // thin mortar line
 
 export class GroundRenderer {
   static create(screenW, screenH) {
-    // --- 绘制棋盘格地砖 ---
+    // --- 绘制棋盘格地砖纹理 ---
     const colorCanvas = document.createElement('canvas');
     colorCanvas.width = TILE_SIZE;
     colorCanvas.height = TILE_SIZE;
     const ctx = colorCanvas.getContext('2d');
 
-    // 深色填缝底色
-    ctx.fillStyle = '#0d0d0d';
+    // 深色缝隙底色
+    ctx.fillStyle = '#0a0a0a';
     ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
 
-    const shades = ['#222222', '#2a2a2a', '#262626', '#2e2e2e'];
+    const shades = ['#1e1e1e', '#242424', '#202020', '#282828', '#1c1c1c', '#262626'];
     for (let row = 0; row < GRID; row++) {
       for (let col = 0; col < GRID; col++) {
         const shade = shades[(row + col) % shades.length];
@@ -29,7 +29,7 @@ export class GroundRenderer {
       }
     }
 
-    // --- 生成法线贴图 ---
+    // --- 生成法线贴图（与纹理边缘严格对齐） ---
     const normalCanvas = document.createElement('canvas');
     normalCanvas.width = TILE_SIZE;
     normalCanvas.height = TILE_SIZE;
@@ -39,16 +39,16 @@ export class GroundRenderer {
     const pixels = imageData.data;
     const normalData = nctx.createImageData(TILE_SIZE, TILE_SIZE);
 
+    // 用 2px 采样核检测边缘，与 GAP 宽度匹配
+    const K = 2;
     for (let y = 0; y < TILE_SIZE; y++) {
       for (let x = 0; x < TILE_SIZE; x++) {
-        // 使用更大的采样核检测瓷砖边缘
-        const halfKernel = 4;
-        const gx = sampleLum(pixels, x + halfKernel, y, TILE_SIZE)
-                 - sampleLum(pixels, x - halfKernel, y, TILE_SIZE);
-        const gy = sampleLum(pixels, x, y + halfKernel, TILE_SIZE)
-                 - sampleLum(pixels, x, y - halfKernel, TILE_SIZE);
+        const gx = sample(pixels, x + K, y, TILE_SIZE)
+                 - sample(pixels, x - K, y, TILE_SIZE);
+        const gy = sample(pixels, x, y + K, TILE_SIZE)
+                 - sample(pixels, x, y - K, TILE_SIZE);
 
-        const strength = 3.0;
+        const strength = 2.2;
         const nx = -gx * strength / 255.0;
         const ny = -gy * strength / 255.0;
         const nz = 1.0;
@@ -76,7 +76,7 @@ export class GroundRenderer {
   }
 }
 
-function sampleLum(pixels, x, y, size) {
+function sample(pixels, x, y, size) {
   if (x < 0 || y < 0 || x >= size || y >= size) return 0;
   const idx = (y * size + x) * 4;
   return pixels[idx] * 0.299 + pixels[idx + 1] * 0.587 + pixels[idx + 2] * 0.114;
