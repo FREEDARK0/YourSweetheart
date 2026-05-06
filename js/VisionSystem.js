@@ -37,12 +37,14 @@ void main() {
 
     float alpha = max(max(hotspot, cutoff), glow);
 ${logic}
-    // HARDCODED TEST: large transparent circle at (200,200)
+    // DIAGNOSTIC: tint everything reddish except test circle at (200,200)
+    // If you see the ENTIRE screen turn reddish, the shader is running.
+    // A normal (non-red) circle at (200,200) means vScreenPos is correct.
     if (length(vScreenPos - vec2(200.0, 200.0)) < 120.0) {
-        alpha = 0.0;
+        gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0); // transparent
+    } else {
+        gl_FragColor = vec4(0.3, 0.0, 0.0, 0.85); // reddish dark overlay
     }
-
-    gl_FragColor = vec4(0.0, 0.0, 0.0, alpha);
 }
 `;
 }
