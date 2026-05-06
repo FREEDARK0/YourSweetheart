@@ -343,11 +343,23 @@ export class Game {
     this.groundText.update(dtMs);
     this.hearts.update(dtMs);
 
-    // --- 更新地面光照 filter ---
+    // --- 更新地面光照 ---
     this._groundShader.uniforms.uLightPos[0] = this.mouseX;
     this._groundShader.uniforms.uLightPos[1] = this.mouseY;
     this._groundShader.uniforms.uLightRadius = this.vision.currentRadius;
     this._groundShader.uniforms.uTilePx = 256 / 0.75;
+    // Candle lights on ground
+    const cl = this.placedCandles;
+    for (let i = 0; i < 3; i++) {
+      if (i < cl.length) {
+        const pos = this._groundShader.uniforms[`uC${i}Pos`];
+        pos[0] = cl[i].x; pos[1] = cl[i].y;
+        this._groundShader.uniforms[`uC${i}Pos`] = new Float32Array(pos);
+        this._groundShader.uniforms[`uC${i}Radius`] = cl[i].currentRadius;
+      } else {
+        this._groundShader.uniforms[`uC${i}Radius`] = 0.0;
+      }
+    }
 
     // --- NPC visibility & timer ---
     const candleLights = this.placedCandles.map(c => ({
@@ -718,7 +730,7 @@ export class Game {
   }
 
   _setupVersionLabel() {
-    this.versionLabel = new PIXI.Text('v0.25', {
+    this.versionLabel = new PIXI.Text('v0.26', {
       fontFamily: 'Kurobara',
       fontSize: 14,
       fill: '#333333',

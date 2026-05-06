@@ -26,36 +26,39 @@ uniform vec2 uLightPos;
 uniform float uLightRadius;
 uniform float uAmbient;
 uniform float uTilePx;
+uniform vec2 uC0Pos; uniform float uC0Radius;
+uniform vec2 uC1Pos; uniform float uC1Radius;
+uniform vec2 uC2Pos; uniform float uC2Radius;
+
+float computeLight(vec2 vp, vec3 normal, vec2 lpos, float lrad, float amb) {
+    vec2 delta = vp - lpos;
+    float dist = length(delta);
+    float distNorm = dist / max(lrad, 0.001);
+    float normalStr = 1.0 - smoothstep(0.15, 0.65, distNorm);
+    vec3 blendedNormal = mix(vec3(0.0, 0.0, 1.0), normal, normalStr);
+    vec2 lightDir = normalize(vec2(-delta.x, -delta.y));
+    float NdotL = max(0.0, dot(blendedNormal, vec3(lightDir, 0.2)));
+    float wrap = NdotL * 0.55 + 0.45;
+    float t = smoothstep(lrad * 0.3, lrad, dist);
+    float att = 1.0 - t;
+    return min(1.0, amb + (1.0 - amb) * wrap * att);
+}
 
 void main() {
     vec2 tiledUV = vScreenPos / uTilePx;
     vec4 texColor = texture2D(uColorTex, tiledUV);
-
     vec3 normal = texture2D(uNormalTex, tiledUV).rgb * 2.0 - 1.0;
 
-    vec2 delta = vScreenPos - uLightPos;
-    float dist = length(delta);
-    float distNorm = dist / max(uLightRadius, 0.001);
+    float light = computeLight(vScreenPos, normal, uLightPos, uLightRadius, uAmbient);
 
-    // Normal strength fades toward edge
-    float normalStr = 1.0 - smoothstep(0.15, 0.65, distNorm);
-    vec3 blendedNormal = mix(vec3(0.0, 0.0, 1.0), normal, normalStr);
+    if (uC0Radius > 1.0) light = max(light, computeLight(vScreenPos, normal, uC0Pos, uC0Radius, uAmbient));
+    if (uC1Radius > 1.0) light = max(light, computeLight(vScreenPos, normal, uC1Pos, uC1Radius, uAmbient));
+    if (uC2Radius > 1.0) light = max(light, computeLight(vScreenPos, normal, uC2Pos, uC2Radius, uAmbient));
 
-    // Contrast fades toward edge
+    float distNorm = length(vScreenPos - uLightPos) / max(uLightRadius, 0.001);
     float contrastStr = 1.0 - smoothstep(0.10, 0.60, distNorm) * 0.92;
     float gray = dot(texColor.rgb, vec3(0.299, 0.587, 0.114));
     texColor.rgb = mix(vec3(gray), texColor.rgb, contrastStr);
-
-    // Lighting
-    vec2 lightDir2D = normalize(vec2(-delta.x, -delta.y));
-    float NdotL = max(0.0, dot(blendedNormal, vec3(lightDir2D, 0.2)));
-    float wrap = NdotL * 0.55 + 0.45;
-
-    float t = smoothstep(uLightRadius * 0.3, uLightRadius, dist);
-    float attenuation = 1.0 - t;
-
-    float light = uAmbient + (1.0 - uAmbient) * wrap * attenuation;
-    light = min(1.0, light);
 
     gl_FragColor = texColor * vec4(light, light, light, 1.0);
 }
@@ -154,6 +157,12 @@ export class GroundRenderer {
       uLightRadius: 100,
       uAmbient:    0.03,
       uTilePx:     TILE_SIZE / 0.75,
+      uC0Pos:      new Float32Array([0, 0]),
+      uC0Radius:   0.0,
+      uC1Pos:      new Float32Array([0, 0]),
+      uC1Radius:   0.0,
+      uC2Pos:      new Float32Array([0, 0]),
+      uC2Radius:   0.0,
     });
 
     const geometry = new PIXI.Geometry()
