@@ -11,6 +11,7 @@ import { Ghost } from './entities/Ghost.js';
 import { BloodSplatter } from './effects/BloodSplatter.js';
 import { GroundRenderer } from './GroundRenderer.js';
 import { GroundLightingFilter } from './shaders/GroundLightingFilter.js';
+import { NpcLightingFilter } from './shaders/NpcLightingFilter.js';
 
 const MAX_OUT_OF_VISION_MS = 6000;
 const WARNING_THRESHOLD_MS = 2000;
@@ -86,6 +87,14 @@ export class Game {
     this.vision = new VisionSystem(this.app, this.layers.overlay, this.mouseX, this.mouseY, this.visionRadius);
     this.npc = new NPC(this.app.screen.width / 2, this.app.screen.height / 2, girlTex);
     this.layers.npcLayer.addChild(this.npc.display);
+
+    // NPC 逐像素点光源 filter
+    this._npcLightRadius = Math.max(180, this.visionRadius * 1.2);
+    this._npcFilter = new NpcLightingFilter(
+      this.npc.x, this.npc.y, this.npc._spriteWorldW, this.npc._spriteWorldH,
+      0.5, 0.85, this.mouseX, this.mouseY, this._npcLightRadius
+    );
+    this.npc.sprite.filters = [this._npcFilter];
 
     this.groundText = new GroundText(this.layers.groundTextLayer, this.layers.groundTextOverlay);
     this.hearts = new HeartParticles(this.layers.particleLayer);
@@ -274,14 +283,14 @@ export class Game {
     this.npc.display.x = this.npc.x;
     this.npc.display.y = this.npc.y;
 
-    // NPC 动态影子 + 手电筒光照 tint
-    this.npc.updateShadow(this.mouseX, this.mouseY, this.vision.currentRadius);
-    const npcDist = Math.hypot(this.npc.x - this.mouseX, this.npc.y - this.mouseY);
-    const npcLight = npcDist < this.vision.currentRadius
-      ? 1.0 - (npcDist / this.vision.currentRadius) * 0.4
-      : 0.08;
-    const lc = Math.floor(255 * Math.max(0.08, npcLight));
-    this.npc.sprite.tint = (lc << 16) | (lc << 8) | lc;
+    // NPC 动态影子 + 逐像素点光源 filter
+    this.npc.updateShadow(this.mouseX, this.mouseY);
+    this._npcLightRadius = Math.max(160, this.vision.currentRadius * 0.9);
+    this._npcFilter.update(
+      this.npc.x, this.npc.y + this.npc._bobOffset,
+      this.npc._spriteWorldW, this.npc._spriteWorldH,
+      this.mouseX, this.mouseY, this._npcLightRadius
+    );
 
     // --- Love state ---
     this._handleLoveState(dt, dtMs);

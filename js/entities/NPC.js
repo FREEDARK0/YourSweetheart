@@ -21,13 +21,13 @@ export class NPC {
     this.display.x = x;
     this.display.y = y;
 
-    // 影子（在地面上，NPC 下方）
+    // 影子（半透明黑色剪影，投射在地面上）
     this._shadow = new PIXI.Sprite(texture);
     this._shadow.anchor.set(0.5, 0.85);
     this._shadow.scale.set(scale);
-    this._shadow.scale.y *= 0.35; // 压扁模拟地面投影
+    this._shadow.scale.y *= 0.45; // 稍压扁模拟地面投影
     this._shadow.tint = 0x000000;
-    this._shadow.alpha = 0.28;
+    this._shadow.alpha = 0.4;
     this.display.addChild(this._shadow);
 
     // 主体精灵
@@ -35,6 +35,10 @@ export class NPC {
     this.sprite.anchor.set(0.5, 0.85);
     this.sprite.scale.set(scale);
     this.display.addChild(this.sprite);
+
+    // 缓存精灵世界尺寸，供 filter 使用
+    this._spriteWorldW = texture.width * scale;
+    this._spriteWorldH = texture.height * scale;
   }
 
   updateAnimation(dt, dx, dy) {
@@ -66,7 +70,7 @@ export class NPC {
     this.sprite.y = this._bobOffset;
   }
 
-  updateShadow(lightX, lightY, lightRadius) {
+  updateShadow(lightX, lightY) {
     const dx = this.x - lightX;
     const dy = this.y - lightY;
     const dist = Math.sqrt(dx * dx + dy * dy);
@@ -77,19 +81,12 @@ export class NPC {
     }
 
     // 影子投射方向：远离光源
-    const shadowLen = Math.min(35, dist * 0.22);
+    const shadowLen = Math.min(50, dist * 0.30);
     this._shadow.x = (dx / dist) * shadowLen;
-    this._shadow.y = (dy / dist) * shadowLen + this._bobOffset + 4;
+    this._shadow.y = (dy / dist) * shadowLen + this._bobOffset + 6;
 
     // 影子朝向与主体一致
     this._shadow.scale.x = Math.abs(this.sprite.scale.x);
-
-    // 越靠近光源边缘影子越淡
-    const edgeFade = dist < lightRadius
-      ? 1.0
-      : Math.max(0, 1.0 - (dist - lightRadius) / 50);
-    this._shadow.alpha = 0.28 * edgeFade;
-    this._shadow.visible = edgeFade > 0.03;
   }
 
   isInVision(vision) {
