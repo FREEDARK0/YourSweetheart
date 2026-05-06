@@ -112,6 +112,7 @@ export class Game {
 
     this._setupTimerDisplay();
     this._setupInventoryUI();
+    this._setupVersionLabel();
 
     this.app.ticker.add((delta) => this._update(delta));
   }
@@ -205,6 +206,7 @@ export class Game {
       this.screenEffects.resize(w, h);
       this.inventoryUI.x = w - 15;
       this.inventoryUI.y = h - 15;
+      this.versionLabel.y = h - 8;
     });
   }
 
@@ -356,6 +358,7 @@ export class Game {
 
     // --- Inventory UI ---
     this._updateInventoryUI();
+    this._updateVersionLabel();
 
     if (this.outOfVisionTimer >= MAX_OUT_OF_VISION_MS) {
       this._endGame();
@@ -705,11 +708,27 @@ export class Game {
     this.inventoryUI.y = this.app.screen.height - 15;
   }
 
+  _setupVersionLabel() {
+    this.versionLabel = new PIXI.Text('v0.5', {
+      fontFamily: 'Kurobara',
+      fontSize: 14,
+      fill: '#333333',
+    });
+    this.versionLabel.anchor.set(0, 1);
+    this.versionLabel.x = 8;
+    this.layers.uiLayer.addChild(this.versionLabel);
+  }
+
+  _updateVersionLabel() {
+    this.versionLabel.y = this.app.screen.height - 8;
+  }
+
   _endGame() {
     this.state = 'gameover';
     this.timerText.visible = false;
     this.timerBg.visible = false;
     this.inventoryUI.visible = false;
+    this.versionLabel.visible = false;
     this.npc.setVisible(false);
     this.hearts.stop();
     this.jumpscare.trigger();
@@ -751,6 +770,7 @@ export class Game {
     this.timerText.visible = true;
     this.timerBg.visible = true;
     this.inventoryUI.visible = true;
+    this.versionLabel.visible = true;
 
     // Reset vision
     this.vision.reset();

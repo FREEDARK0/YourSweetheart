@@ -51,7 +51,14 @@ const FRAGMENT_SRC = buildFragmentSrc();
 let _sharedProgram = null;
 function getProgram() {
   if (!_sharedProgram) {
-    _sharedProgram = PIXI.Program.from(VERTEX_SRC, FRAGMENT_SRC);
+    console.log('[Vision] Fragment shader source:');
+    console.log(FRAGMENT_SRC);
+    try {
+      _sharedProgram = PIXI.Program.from(VERTEX_SRC, FRAGMENT_SRC);
+      console.log('[Vision] Program compiled OK');
+    } catch (e) {
+      console.error('[Vision] Program compilation failed:', e);
+    }
   }
   return _sharedProgram;
 }
