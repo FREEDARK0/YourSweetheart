@@ -124,16 +124,15 @@ export class ItemEffects {
     });
   }
 
-  // ---- Bottle: 酒醉摇摆 3 秒 ----
+  // ---- Bottle: drunken sway 3s, view follows a wandering point near mouse ----
   _activateBottle(item, ctx) {
     const { game } = ctx;
     game._visionDrift = {
       timer: 3.0,
-      driftX: 0,
-      driftY: 0,
-      // Smooth random walk: a "drift target" that wanders slowly
-      _targetX: 0,
-      _targetY: 0,
+      wanderX: game.rawMouseX,
+      wanderY: game.rawMouseY,
+      _vx: 0,
+      _vy: 0,
     };
   }
 
@@ -188,34 +187,32 @@ export class ItemEffects {
       }
     }
 
-    // Update vision drift (bottle effect — drunken sway)
+    // Update vision drift (bottle effect — view follows a wandering point near mouse)
     if (game._visionDrift) {
-      game._visionDrift.timer -= dt;
-
       const d = game._visionDrift;
+      d.timer -= dt;
 
-      // Bounded random walk: small random steps each frame
-      const walkSpeed = 55; // max pixels per second of random walk
-      d._targetX += (Math.random() - 0.5) * walkSpeed * 2 * dt;
-      d._targetY += (Math.random() - 0.5) * walkSpeed * 2 * dt;
+      // Random acceleration: the wandering point moves like a drunk person
+      const accel = 180;
+      d._vx += (Math.random() - 0.5) * accel * 2 * dt;
+      d._vy += (Math.random() - 0.5) * accel * 2 * dt;
 
-      // Soft circular boundary at 65px radius
-      const dist = Math.sqrt(d._targetX * d._targetX + d._targetY * d._targetY);
-      const maxDist = 65;
-      if (dist > maxDist) {
-        const scale = maxDist / dist;
-        d._targetX *= scale;
-        d._targetY *= scale;
-      }
+      // Damping so velocity doesn't explode
+      d._vx *= Math.exp(-3 * dt);
+      d._vy *= Math.exp(-3 * dt);
 
-      // Gentle restoring force toward center so it doesn't hug the edge
-      d._targetX *= (1 - 0.5 * dt);
-      d._targetY *= (1 - 0.5 * dt);
+      // Pull toward raw mouse so the wandering point stays near it
+      const pull = 3.5;
+      d._vx += (game.rawMouseX - d.wanderX) * pull * dt;
+      d._vy += (game.rawMouseY - d.wanderY) * pull * dt;
 
-      // Smooth lerp from actual drift toward the wandering target
-      const driftLerp = Math.min(1, 2.5 * dt);
-      d.driftX += (d._targetX - d.driftX) * driftLerp;
-      d.driftY += (d._targetY - d.driftY) * driftLerp;
+      // Move
+      d.wanderX += d._vx * dt;
+      d.wanderY += d._vy * dt;
+
+      // Clamp to screen
+      d.wanderX = Math.max(0, Math.min(game.app.screen.width, d.wanderX));
+      d.wanderY = Math.max(0, Math.min(game.app.screen.height, d.wanderY));
 
       if (d.timer <= 0) {
         game._visionDrift = null;

@@ -354,12 +354,12 @@ export class Game {
     targetX = Math.max(0, Math.min(this.app.screen.width, targetX));
     targetY = Math.max(0, Math.min(this.app.screen.height, targetY));
 
-    // Bottle drift
-    let lerpSpeed = 1.0; // instant by default
+    // Bottle: follow a wandering point near the mouse instead of the mouse itself
+    let lerpSpeed = 1.0;
     if (this._visionDrift) {
-      lerpSpeed = 0.12; // drunken delay: view lags behind the drifting target
-      targetX += this._visionDrift.driftX;
-      targetY += this._visionDrift.driftY;
+      lerpSpeed = 0.1;
+      targetX = this._visionDrift.wanderX;
+      targetY = this._visionDrift.wanderY;
     }
 
     // Smooth follow
