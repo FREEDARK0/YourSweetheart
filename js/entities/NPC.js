@@ -82,15 +82,16 @@ export class NPC {
     const baseHalfW = 32;
     const baseHalfH = 16;
 
-    // 向鼠标方向拉伸的距离
-    const pull = t * 50;
+    // 向鼠标方向拉伸的距离（大幅增加）
+    const pull = t * 110;
 
-    // 用重叠椭圆模拟单侧拉伸变形（不旋转，逐层偏移+缩小）
+    // 用重叠椭圆模拟单侧拉伸变形
     const layers = [
       { frac: 0.0, wMul: 1.00, hMul: 1.00, alpha: 0.30 },
-      { frac: 0.3, wMul: 0.82, hMul: 0.85, alpha: 0.38 },
-      { frac: 0.6, wMul: 0.55, hMul: 0.60, alpha: 0.48 },
-      { frac: 0.85, wMul: 0.28, hMul: 0.30, alpha: 0.55 },
+      { frac: 0.2, wMul: 0.80, hMul: 0.82, alpha: 0.36 },
+      { frac: 0.4, wMul: 0.55, hMul: 0.58, alpha: 0.44 },
+      { frac: 0.6, wMul: 0.32, hMul: 0.34, alpha: 0.52 },
+      { frac: 0.8, wMul: 0.14, hMul: 0.15, alpha: 0.56 },
     ];
 
     for (const l of layers) {
