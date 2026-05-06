@@ -72,34 +72,37 @@ export class NPC {
     this._shadowGfx.clear();
     if (dist < 1) return;
 
-    // 鼠标↔NPC 方向
     const dirX = dx / dist;
     const dirY = dy / dist;
-    const angle = Math.atan2(dy, dx);
 
-    // 拉伸/偏移程度：0（鼠标紧贴）→ 1（鼠标很远）
+    // 拉伸程度：鼠标越远变形越大
     const t = Math.min(1.0, dist / 350);
 
-    // 椭圆沿鼠标方向拉长
-    const halfW = 26 + t * 55;
-    const halfH = 12 + t * 1;
+    // 基础椭圆尺寸（比之前更大、更圆）
+    const baseHalfW = 32;
+    const baseHalfH = 16;
 
-    // 椭圆中心向鼠标方向偏移
-    const offsetX = dirX * t * 28;
-    const offsetY = dirY * t * 28;
+    // 向鼠标方向拉伸的距离
+    const pull = t * 50;
 
-    // 两层渐变
-    this._shadowGfx.beginFill(0x000000, 0.30);
-    this._shadowGfx.drawEllipse(0, 0, halfW * 1.2, halfH * 1.6);
-    this._shadowGfx.endFill();
+    // 用重叠椭圆模拟单侧拉伸变形（不旋转，逐层偏移+缩小）
+    const layers = [
+      { frac: 0.0, wMul: 1.00, hMul: 1.00, alpha: 0.30 },
+      { frac: 0.3, wMul: 0.82, hMul: 0.85, alpha: 0.38 },
+      { frac: 0.6, wMul: 0.55, hMul: 0.60, alpha: 0.48 },
+      { frac: 0.85, wMul: 0.28, hMul: 0.30, alpha: 0.55 },
+    ];
 
-    this._shadowGfx.beginFill(0x000000, 0.55);
-    this._shadowGfx.drawEllipse(0, 0, halfW, halfH);
-    this._shadowGfx.endFill();
+    for (const l of layers) {
+      const cx = dirX * pull * l.frac;
+      const cy = dirY * pull * l.frac;
+      this._shadowGfx.beginFill(0x000000, l.alpha);
+      this._shadowGfx.drawEllipse(cx, cy, baseHalfW * l.wMul, baseHalfH * l.hMul);
+      this._shadowGfx.endFill();
+    }
 
-    this._shadowGfx.rotation = angle;
-    this._shadowGfx.x = offsetX;
-    this._shadowGfx.y = offsetY + this._bobOffset + 8;
+    this._shadowGfx.x = 0;
+    this._shadowGfx.y = this._bobOffset + 8;
   }
 
   isInVision(vision) {
