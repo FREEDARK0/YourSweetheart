@@ -74,35 +74,47 @@ export class NPC {
     if (dist < 1) return;
 
     // 投射方向：远离光源
-    const castX = dx / dist;
-    const castY = dy / dist;
-    const castAngle = Math.atan2(castY, castX);
+    const castAngle = Math.atan2(dy, dx);
 
-    // 影子长度：光源越近影子越长
-    const shadowLen = Math.min(130, 60 + 180 / Math.max(20, dist));
+    // 影子长度：光源越近影子越短
+    const shadowLen = Math.min(140, 25 + dist * 0.35);
 
-    // 影子中心在投射方向上偏移
-    const offsetX = castX * shadowLen * 0.35;
-    const offsetY = castY * shadowLen * 0.35 + this._bobOffset + 6;
+    // 梯形尺寸：底部（靠近 NPC）宽，远端窄
+    const baseHalfW = 24;
+    const tipHalfW  = 8;
 
-    // 椭圆半宽和半高（沿投射方向拉长）
-    const halfW = shadowLen * 0.45;
-    const halfH = 18;
+    // 多层绘制（从外到内，深色叠在浅色上）
+    // 外层柔化
+    this._shadowGfx.beginFill(0x000000, 0.18);
+    this._shadowGfx.moveTo(-baseHalfW * 1.25, 2);
+    this._shadowGfx.lineTo( baseHalfW * 1.25, 2);
+    this._shadowGfx.lineTo( tipHalfW * 1.5, -shadowLen);
+    this._shadowGfx.lineTo(-tipHalfW * 1.5, -shadowLen);
+    this._shadowGfx.closePath();
+    this._shadowGfx.endFill();
 
-    // 核心阴影
+    // 中层过渡
     this._shadowGfx.beginFill(0x000000, 0.50);
-    this._shadowGfx.drawEllipse(offsetX, offsetY, halfW, halfH);
+    this._shadowGfx.moveTo(-baseHalfW * 1.05, 1);
+    this._shadowGfx.lineTo( baseHalfW * 1.05, 1);
+    this._shadowGfx.lineTo( tipHalfW * 1.15, -shadowLen);
+    this._shadowGfx.lineTo(-tipHalfW * 1.15, -shadowLen);
+    this._shadowGfx.closePath();
     this._shadowGfx.endFill();
 
-    // 外围柔化
-    this._shadowGfx.beginFill(0x000000, 0.22);
-    this._shadowGfx.drawEllipse(offsetX, offsetY, halfW * 1.25, halfH * 1.4);
+    // 核心浓黑
+    this._shadowGfx.beginFill(0x000000, 0.82);
+    this._shadowGfx.moveTo(-baseHalfW, 0);
+    this._shadowGfx.lineTo( baseHalfW, 0);
+    this._shadowGfx.lineTo( tipHalfW, -shadowLen);
+    this._shadowGfx.lineTo(-tipHalfW, -shadowLen);
+    this._shadowGfx.closePath();
     this._shadowGfx.endFill();
 
-    // 最外层淡出
-    this._shadowGfx.beginFill(0x000000, 0.08);
-    this._shadowGfx.drawEllipse(offsetX, offsetY, halfW * 1.5, halfH * 1.8);
-    this._shadowGfx.endFill();
+    // 旋转使阴影指向远离光源的方向
+    this._shadowGfx.rotation = castAngle + Math.PI / 2;
+    this._shadowGfx.x = 0;
+    this._shadowGfx.y = this._bobOffset + 6;
   }
 
   isInVision(vision) {
