@@ -357,7 +357,7 @@ export class Game {
     // Bottle drift
     let lerpSpeed = 1.0; // instant by default
     if (this._visionDrift) {
-      lerpSpeed = 0.18; // moderate delay, less pull than before
+      lerpSpeed = 0.12; // drunken delay: view lags behind the drifting target
       targetX += this._visionDrift.driftX;
       targetY += this._visionDrift.driftY;
     }

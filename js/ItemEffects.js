@@ -131,11 +131,9 @@ export class ItemEffects {
       timer: 3.0,
       driftX: 0,
       driftY: 0,
-      _wobbleX: 0,
-      _wobbleY: 0,
+      // Smooth random walk: a "drift target" that wanders slowly
       _targetX: 0,
       _targetY: 0,
-      _changeTimer: 0,
     };
   }
 
@@ -190,29 +188,36 @@ export class ItemEffects {
       }
     }
 
-    // Update vision drift (bottle effect — 酒醉摇摆)
+    // Update vision drift (bottle effect — drunken sway)
     if (game._visionDrift) {
       game._visionDrift.timer -= dt;
-      game._visionDrift._changeTimer -= dt;
 
-      // 频繁切换随机方向
-      if (game._visionDrift._changeTimer <= 0) {
-        const angle = Math.random() * Math.PI * 2;
-        const dist = 25 + Math.random() * 55;
-        game._visionDrift._targetX = Math.cos(angle) * dist;
-        game._visionDrift._targetY = Math.sin(angle) * dist;
-        game._visionDrift._changeTimer = 0.18 + Math.random() * 0.4;
+      const d = game._visionDrift;
+
+      // Bounded random walk: small random steps each frame
+      const walkSpeed = 55; // max pixels per second of random walk
+      d._targetX += (Math.random() - 0.5) * walkSpeed * 2 * dt;
+      d._targetY += (Math.random() - 0.5) * walkSpeed * 2 * dt;
+
+      // Soft circular boundary at 65px radius
+      const dist = Math.sqrt(d._targetX * d._targetX + d._targetY * d._targetY);
+      const maxDist = 65;
+      if (dist > maxDist) {
+        const scale = maxDist / dist;
+        d._targetX *= scale;
+        d._targetY *= scale;
       }
 
-      // 平滑 lerp 到目标偏移
-      const lerpSpeed = Math.min(1, 5 * dt);
-      game._visionDrift._wobbleX += (game._visionDrift._targetX - game._visionDrift._wobbleX) * lerpSpeed;
-      game._visionDrift._wobbleY += (game._visionDrift._targetY - game._visionDrift._wobbleY) * lerpSpeed;
+      // Gentle restoring force toward center so it doesn't hug the edge
+      d._targetX *= (1 - 0.5 * dt);
+      d._targetY *= (1 - 0.5 * dt);
 
-      game._visionDrift.driftX = game._visionDrift._wobbleX;
-      game._visionDrift.driftY = game._visionDrift._wobbleY;
+      // Smooth lerp from actual drift toward the wandering target
+      const driftLerp = Math.min(1, 2.5 * dt);
+      d.driftX += (d._targetX - d.driftX) * driftLerp;
+      d.driftY += (d._targetY - d.driftY) * driftLerp;
 
-      if (game._visionDrift.timer <= 0) {
+      if (d.timer <= 0) {
         game._visionDrift = null;
       }
     }
