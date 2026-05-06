@@ -274,6 +274,15 @@ export class Game {
     this.npc.display.x = this.npc.x;
     this.npc.display.y = this.npc.y;
 
+    // NPC 动态影子 + 手电筒光照 tint
+    this.npc.updateShadow(this.mouseX, this.mouseY, this.vision.currentRadius);
+    const npcDist = Math.hypot(this.npc.x - this.mouseX, this.npc.y - this.mouseY);
+    const npcLight = npcDist < this.vision.currentRadius
+      ? 1.0 - (npcDist / this.vision.currentRadius) * 0.4
+      : 0.08;
+    const lc = Math.floor(255 * Math.max(0.08, npcLight));
+    this.npc.sprite.tint = (lc << 16) | (lc << 8) | lc;
+
     // --- Love state ---
     this._handleLoveState(dt, dtMs);
 

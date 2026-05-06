@@ -47,7 +47,7 @@ export class GroundLightingFilter extends PIXI.Filter {
       uLightPosNorm:   new Float32Array([lightX / screenW, lightY / screenH]),
       uLightRadiusNorm: radius / minDim,
       uAspect:         screenW / Math.max(1, screenH),
-      uAmbient:        0.06,
+      uAmbient:        0.03,
       uNormalMap:      normalTex,
       uScreenSize:     new Float32Array([screenW, screenH]),
       uTilePx:         tileSize / tileScale,

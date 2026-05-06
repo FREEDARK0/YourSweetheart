@@ -1,7 +1,7 @@
 const TARGET_WIDTH = 100;
 const BOB_AMPLITUDE = 5;
-const BOB_FREQ = 2.5;      // oscillations per second while moving
-const BOB_RETURN = 6;    // lerp speed when returning to center
+const BOB_FREQ = 2.5;
+const BOB_RETURN = 6;
 
 export class NPC {
   constructor(x, y, texture) {
@@ -15,15 +15,25 @@ export class NPC {
     this._bobTime = 0;
     this._bobOffset = 0;
 
-    this.sprite = new PIXI.Sprite(texture);
-    this.sprite.anchor.set(0.5, 0.85);
-
     const scale = TARGET_WIDTH / texture.width;
-    this.sprite.scale.set(scale);
 
     this.display = new PIXI.Container();
     this.display.x = x;
     this.display.y = y;
+
+    // 影子（在地面上，NPC 下方）
+    this._shadow = new PIXI.Sprite(texture);
+    this._shadow.anchor.set(0.5, 0.85);
+    this._shadow.scale.set(scale);
+    this._shadow.scale.y *= 0.35; // 压扁模拟地面投影
+    this._shadow.tint = 0x000000;
+    this._shadow.alpha = 0.28;
+    this.display.addChild(this._shadow);
+
+    // 主体精灵
+    this.sprite = new PIXI.Sprite(texture);
+    this.sprite.anchor.set(0.5, 0.85);
+    this.sprite.scale.set(scale);
     this.display.addChild(this.sprite);
   }
 
@@ -54,6 +64,32 @@ export class NPC {
     }
 
     this.sprite.y = this._bobOffset;
+  }
+
+  updateShadow(lightX, lightY, lightRadius) {
+    const dx = this.x - lightX;
+    const dy = this.y - lightY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    if (dist < 1) {
+      this._shadow.visible = false;
+      return;
+    }
+
+    // 影子投射方向：远离光源
+    const shadowLen = Math.min(35, dist * 0.22);
+    this._shadow.x = (dx / dist) * shadowLen;
+    this._shadow.y = (dy / dist) * shadowLen + this._bobOffset + 4;
+
+    // 影子朝向与主体一致
+    this._shadow.scale.x = Math.abs(this.sprite.scale.x);
+
+    // 越靠近光源边缘影子越淡
+    const edgeFade = dist < lightRadius
+      ? 1.0
+      : Math.max(0, 1.0 - (dist - lightRadius) / 50);
+    this._shadow.alpha = 0.28 * edgeFade;
+    this._shadow.visible = edgeFade > 0.03;
   }
 
   isInVision(vision) {

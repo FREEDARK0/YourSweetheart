@@ -10,9 +10,17 @@ const fragSrc = `
     vec2 delta = vTextureCoord - uLightPosNorm;
     delta.x *= uAspect;
     float dist = length(delta);
-    float t = smoothstep(uLightRadiusNorm * 0.2, uLightRadiusNorm, dist);
-    float glow = smoothstep(uLightRadiusNorm * 0.85, uLightRadiusNorm * 1.05, dist) * 0.08;
-    float alpha = max(t, glow);
+
+    // 中心热点：中心完全透明，到 70% 半径处微微变暗
+    float hotspot = smoothstep(0.0, uLightRadiusNorm * 0.7, dist) * 0.10;
+
+    // 主截断：软边过渡到完全不透明
+    float cutoff = smoothstep(uLightRadiusNorm * 0.2, uLightRadiusNorm, dist);
+
+    // 边缘微光环
+    float glow = smoothstep(uLightRadiusNorm * 0.88, uLightRadiusNorm * 1.05, dist) * 0.06;
+
+    float alpha = max(max(hotspot, cutoff), glow);
     gl_FragColor = vec4(0.0, 0.0, 0.0, alpha);
   }
 `;
