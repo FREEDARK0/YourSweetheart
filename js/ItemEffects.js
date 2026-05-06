@@ -124,15 +124,18 @@ export class ItemEffects {
     });
   }
 
-  // ---- Bottle: drift + delay on vision for 2 seconds ----
+  // ---- Bottle: 酒醉摇摆 3 秒 ----
   _activateBottle(item, ctx) {
     const { game } = ctx;
     game._visionDrift = {
-      timer: 2.0,
-      driftAngle: Math.random() * Math.PI * 2,
-      driftRadius: 130 + Math.random() * 50, // large orbit radius
+      timer: 3.0,
       driftX: 0,
       driftY: 0,
+      _wobbleX: 0,
+      _wobbleY: 0,
+      _targetX: 0,
+      _targetY: 0,
+      _changeTimer: 0,
     };
   }
 
@@ -187,14 +190,27 @@ export class ItemEffects {
       }
     }
 
-    // Update vision drift (bottle effect)
+    // Update vision drift (bottle effect — 酒醉摇摆)
     if (game._visionDrift) {
       game._visionDrift.timer -= dt;
-      // Drift angle changes smoothly, creating an orbiting pull around the mouse
-      game._visionDrift.driftAngle += (Math.random() - 0.5) * 2.0 * dt;
-      const r = game._visionDrift.driftRadius;
-      game._visionDrift.driftX = Math.cos(game._visionDrift.driftAngle) * r;
-      game._visionDrift.driftY = Math.sin(game._visionDrift.driftAngle) * r;
+      game._visionDrift._changeTimer -= dt;
+
+      // 频繁切换随机方向
+      if (game._visionDrift._changeTimer <= 0) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 25 + Math.random() * 55;
+        game._visionDrift._targetX = Math.cos(angle) * dist;
+        game._visionDrift._targetY = Math.sin(angle) * dist;
+        game._visionDrift._changeTimer = 0.18 + Math.random() * 0.4;
+      }
+
+      // 平滑 lerp 到目标偏移
+      const lerpSpeed = Math.min(1, 5 * dt);
+      game._visionDrift._wobbleX += (game._visionDrift._targetX - game._visionDrift._wobbleX) * lerpSpeed;
+      game._visionDrift._wobbleY += (game._visionDrift._targetY - game._visionDrift._wobbleY) * lerpSpeed;
+
+      game._visionDrift.driftX = game._visionDrift._wobbleX;
+      game._visionDrift.driftY = game._visionDrift._wobbleY;
 
       if (game._visionDrift.timer <= 0) {
         game._visionDrift = null;
