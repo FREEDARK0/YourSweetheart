@@ -1,25 +1,26 @@
 const TILE_SIZE = 256;
 const GRID = 8;          // 8×8 square tiles
 const CELL = TILE_SIZE / GRID; // 32px per tile
-const GAP = 1;           // thin mortar line
+const GAP = 1;           // mortar line width
 
 export class GroundRenderer {
   static create(screenW, screenH) {
-    // --- 绘制棋盘格地砖纹理 ---
+    // --- 两色交替棋盘格纹理 ---
     const colorCanvas = document.createElement('canvas');
     colorCanvas.width = TILE_SIZE;
     colorCanvas.height = TILE_SIZE;
     const ctx = colorCanvas.getContext('2d');
 
-    // 深色缝隙底色
+    // 缝隙底色
     ctx.fillStyle = '#0a0a0a';
     ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
 
-    const shades = ['#1e1e1e', '#242424', '#202020', '#282828', '#1c1c1c', '#262626'];
+    const dark  = '#1a1a1a';
+    const light = '#2c2c2c';
+
     for (let row = 0; row < GRID; row++) {
       for (let col = 0; col < GRID; col++) {
-        const shade = shades[(row + col) % shades.length];
-        ctx.fillStyle = shade;
+        ctx.fillStyle = (row + col) % 2 === 0 ? dark : light;
         ctx.fillRect(
           col * CELL + GAP,
           row * CELL + GAP,
@@ -29,7 +30,7 @@ export class GroundRenderer {
       }
     }
 
-    // --- 生成法线贴图（与纹理边缘严格对齐） ---
+    // --- 法线贴图（与纹理边缘严格对齐） ---
     const normalCanvas = document.createElement('canvas');
     normalCanvas.width = TILE_SIZE;
     normalCanvas.height = TILE_SIZE;
@@ -39,7 +40,7 @@ export class GroundRenderer {
     const pixels = imageData.data;
     const normalData = nctx.createImageData(TILE_SIZE, TILE_SIZE);
 
-    // 用 2px 采样核检测边缘，与 GAP 宽度匹配
+    // 2px 采样核匹配 1px 缝隙
     const K = 2;
     for (let y = 0; y < TILE_SIZE; y++) {
       for (let x = 0; x < TILE_SIZE; x++) {

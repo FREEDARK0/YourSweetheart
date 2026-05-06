@@ -7,16 +7,21 @@ const fragSrc = `
   uniform float uLightRadiusNorm;
   uniform float uAspect;
   uniform float uAmbient;
+  uniform vec2 uScreenSize;
+  uniform float uTilePx;  // TILE_SIZE / tileScale = effective tile size in screen pixels
 
   void main() {
     vec4 texColor = texture2D(uSampler, vTextureCoord);
-    vec3 normal = texture2D(uNormalMap, vTextureCoord).rgb * 2.0 - 1.0;
+
+    // 重建 TilingSprite 的平铺 UV，使法线贴图与纹理逐格对齐
+    vec2 screenPx = vTextureCoord * uScreenSize;
+    vec2 tiledUV = screenPx / uTilePx;
+    vec3 normal = texture2D(uNormalMap, tiledUV).rgb * 2.0 - 1.0;
 
     vec2 delta = vTextureCoord - uLightPosNorm;
     delta.x *= uAspect;
     float dist = length(delta);
 
-    // 光照方向（2D，z分量从上方来）
     vec2 lightDir2D = normalize(vec2(-delta.x, -delta.y));
     float NdotL = max(0.0, dot(normal, vec3(lightDir2D, 0.2)));
     float wrap = NdotL * 0.55 + 0.45;
@@ -32,7 +37,11 @@ const fragSrc = `
 `;
 
 export class GroundLightingFilter extends PIXI.Filter {
-  constructor(lightX, lightY, radius, screenW, screenH, normalTex) {
+  /**
+   * @param {number} tileSize - 纹理原始尺寸（px）
+   * @param {number} tileScale - TilingSprite.tileScale 值
+   */
+  constructor(lightX, lightY, radius, screenW, screenH, normalTex, tileSize, tileScale) {
     const minDim = Math.min(screenW, screenH);
     super(null, fragSrc, {
       uLightPosNorm:   new Float32Array([lightX / screenW, lightY / screenH]),
@@ -40,7 +49,11 @@ export class GroundLightingFilter extends PIXI.Filter {
       uAspect:         screenW / Math.max(1, screenH),
       uAmbient:        0.06,
       uNormalMap:      normalTex,
+      uScreenSize:     new Float32Array([screenW, screenH]),
+      uTilePx:         tileSize / tileScale,
     });
+    this._tileSize = tileSize;
+    this._tileScale = tileScale;
   }
 
   update(lightX, lightY, radius, screenW, screenH) {
@@ -49,5 +62,8 @@ export class GroundLightingFilter extends PIXI.Filter {
     this.uniforms.uLightPosNorm[1] = lightY / screenH;
     this.uniforms.uLightRadiusNorm = radius / minDim;
     this.uniforms.uAspect = screenW / Math.max(1, screenH);
+    this.uniforms.uScreenSize[0] = screenW;
+    this.uniforms.uScreenSize[1] = screenH;
+    this.uniforms.uTilePx = this._tileSize / this._tileScale;
   }
 }

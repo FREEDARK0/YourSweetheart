@@ -73,7 +73,8 @@ export class Game {
     this._groundNormalTex = normalTex;
     this._groundFilter = new GroundLightingFilter(
       this.mouseX, this.mouseY, this.visionRadius,
-      this.app.screen.width, this.app.screen.height, normalTex
+      this.app.screen.width, this.app.screen.height, normalTex,
+      256, 1.5
     );
     this._ground.filters = [this._groundFilter];
     this._ground.filterArea = new PIXI.Rectangle(0, 0, this.app.screen.width, this.app.screen.height);
