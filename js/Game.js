@@ -709,7 +709,7 @@ export class Game {
   }
 
   _setupVersionLabel() {
-    this.versionLabel = new PIXI.Text('v0.20', {
+    this.versionLabel = new PIXI.Text('v0.22', {
       fontFamily: 'Kurobara',
       fontSize: 14,
       fill: '#333333',

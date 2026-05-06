@@ -11,12 +11,28 @@ void main(void) {
 `;
 
 function buildFragmentSrc(candles) {
-  let candleLogic = '';
-  for (let i = 0; i < candles.length; i++) {
-    const c = candles[i];
-    const r = Math.max(c.currentRadius, 1);
-    candleLogic += `  alpha = min(alpha, smoothstep(${(r * 0.2).toFixed(1)}, ${r.toFixed(1)}, length(vScreenPos - vec2(${c.x.toFixed(1)}, ${c.y.toFixed(1)}))));\n`;
+  // DIAGNOSTIC: if candles present, replace entire output with red tint to verify hot-swap
+  if (candles.length > 0) {
+    return `precision mediump float;
+varying vec2 vScreenPos;
+uniform vec2 uLightPos;
+uniform float uLightRadius;
+
+void main() {
+    // Draw main vision aperture as transparent, everything else reddish
+    vec2 delta = vScreenPos - uLightPos;
+    float dist = length(delta);
+    float hotspot = smoothstep(0.0, uLightRadius * 0.7, dist) * 0.10;
+    float cutoff = smoothstep(uLightRadius * 0.2, uLightRadius, dist);
+    float glow = smoothstep(uLightRadius * 0.88, uLightRadius * 1.05, dist) * 0.06;
+    float alpha = max(max(hotspot, cutoff), glow);
+    // Candle aperture: transparent circle
+    alpha = min(alpha, smoothstep(${(candles[0].currentRadius * 0.2).toFixed(1)}, ${candles[0].currentRadius.toFixed(1)}, length(vScreenPos - vec2(${candles[0].x.toFixed(1)}, ${candles[0].y.toFixed(1)}))));
+    // Red tint where opaque
+    gl_FragColor = vec4(0.3, 0.0, 0.0, 0.7 + alpha * 0.3);
+}`;
   }
+  // No candles: normal shader
   return `precision mediump float;
 varying vec2 vScreenPos;
 uniform vec2 uLightPos;
@@ -29,7 +45,6 @@ void main() {
     float cutoff = smoothstep(uLightRadius * 0.2, uLightRadius, dist);
     float glow = smoothstep(uLightRadius * 0.88, uLightRadius * 1.05, dist) * 0.06;
     float alpha = max(max(hotspot, cutoff), glow);
-${candleLogic}
     gl_FragColor = vec4(0.0, 0.0, 0.0, alpha);
 }`;
 }
@@ -63,7 +78,8 @@ export class VisionSystem {
     const h = this.app.screen.height;
 
     const fragSrc = buildFragmentSrc(candles);
-    this._shader = PIXI.Shader.from(VERTEX_SRC, fragSrc, {
+    const program = new PIXI.Program(VERTEX_SRC, fragSrc);
+    this._shader = new PIXI.Shader(program, {
       uLightPos:    new Float32Array([x, y]),
       uLightRadius: radius,
     });
@@ -76,7 +92,6 @@ export class VisionSystem {
       this.container.addChildAt(this.darkness, 0);
     } else {
       // Hot-swap shader on existing mesh
-      this.darkness.material = this._shader;
       this.darkness.shader = this._shader;
     }
   }
