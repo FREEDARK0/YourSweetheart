@@ -153,7 +153,7 @@ export class GroundRenderer {
       uLightPos:   new Float32Array([0, 0]),
       uLightRadius: 100,
       uAmbient:    0.03,
-      uTilePx:     TILE_SIZE / 1.5,
+      uTilePx:     TILE_SIZE / 0.75,
     });
 
     const geometry = new PIXI.Geometry()

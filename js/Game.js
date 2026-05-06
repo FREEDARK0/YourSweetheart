@@ -315,7 +315,7 @@ export class Game {
     this._groundShader.uniforms.uLightPos[0] = this.mouseX;
     this._groundShader.uniforms.uLightPos[1] = this.mouseY;
     this._groundShader.uniforms.uLightRadius = this.vision.currentRadius;
-    this._groundShader.uniforms.uTilePx = 256 / 1.5;
+    this._groundShader.uniforms.uTilePx = 256 / 0.75;
 
     // --- NPC visibility & timer ---
     const npcInVision = this.npc.isInVision(this.vision);
