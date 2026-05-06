@@ -11,28 +11,23 @@ const fragSrc = `
   void main() {
     vec4 texColor = texture2D(uSampler, vTextureCoord);
 
-    // 当前像素相对于 NPC 中心的世界坐标偏移
+    // 当前像素的世界坐标
     vec2 localPx = (vTextureCoord - uAnchor) * uSpriteWorldSize;
     vec2 worldPx = uNpcWorldPos + localPx;
 
-    // 光源到 NPC 中心的方向（决定哪一侧亮）
-    vec2 toLight = uLightPos - uNpcWorldPos;
-    float distToNpc = length(toLight);
-    vec2 lightDir = distToNpc > 0.5 ? toLight / distToNpc : vec2(1.0, 0.0);
+    // 到光源的距离
+    float dist = length(worldPx - uLightPos);
 
-    // 当前像素的局部方向（归一化到精灵宽度）
-    vec2 pixDir = localPx / (uSpriteWorldSize * 0.5);
+    // 聚光半径：光源形状投射到 NPC 身上的亮斑大小
+    float spotR = uLightRadius * 0.55;
 
-    // 面向光源的程度：1.0=正对光源，-1.0=背对光源
-    float facing = dot(normalize(pixDir), lightDir);
+    // 窄过渡带形成可见的明暗交接线
+    float t = smoothstep(spotR * 0.45, spotR, dist);
 
-    // 方向光：迎光面亮，背光面暗
-    float dirLight = 0.08 + (facing * 0.5 + 0.5) * 0.92;
+    // 亮斑区域提亮，外部压暗
+    float light = mix(1.35, 0.04, t);
+    light = clamp(light, 0.0, 1.0);
 
-    // 距离衰减：离光源越远整体越暗
-    float distAtten = 1.0 - smoothstep(uLightRadius * 0.3, uLightRadius, distToNpc) * 0.75;
-
-    float light = dirLight * distAtten;
     gl_FragColor = texColor * vec4(light, light, light, 1.0);
   }
 `;
