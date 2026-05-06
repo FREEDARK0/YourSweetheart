@@ -126,13 +126,6 @@ export class VisionSystem {
     this.glowRing.drawCircle(x, y, this.currentRadius);
     this.glowRing.lineStyle(1, this._glowColor, this._glowAlpha * 0.5);
     this.glowRing.drawCircle(x, y, this.currentRadius + 3);
-    // Candle rings (orange)
-    if (this._candleRings) {
-      for (const c of this._candleRings) {
-        this.glowRing.lineStyle(2, 0xff8844, 0.4);
-        this.glowRing.drawCircle(c.x, c.y, c.currentRadius);
-      }
-    }
   }
 
   resize(w, h, radius) {
