@@ -125,8 +125,12 @@ export class VisionSystem {
       this._logged = true;
       try {
         const gl = this.app.renderer.gl;
-        const prog = getProgram();
-        const wp = prog.program || prog._program;
+        // Try multiple paths to get the compiled WebGL program
+        const shaderProg = this._shader.program;
+        const sharedProg = getProgram();
+        const wp = (shaderProg && shaderProg.program) || (shaderProg && shaderProg._program)
+                || (sharedProg && sharedProg.program) || (sharedProg && sharedProg._program);
+        console.log('[Vision] shaderProg:', !!shaderProg, 'wp:', !!wp);
         if (gl && wp) {
           const count = gl.getProgramParameter(wp, gl.ACTIVE_UNIFORMS);
           console.log('[Vision] Active uniforms in program:', count);
@@ -134,8 +138,6 @@ export class VisionSystem {
             const info = gl.getActiveUniform(wp, i);
             console.log(`[Vision]   ${i}: ${info.name} size=${info.size} type=${info.type}`);
           }
-        } else {
-          console.log('[Vision] gl or program not ready', !!gl, !!wp);
         }
       } catch(e) { console.error('[Vision] error:', e); }
     }
