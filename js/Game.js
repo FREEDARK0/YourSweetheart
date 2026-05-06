@@ -10,7 +10,6 @@ import { Tombstone } from './entities/Tombstone.js';
 import { Ghost } from './entities/Ghost.js';
 import { BloodSplatter } from './effects/BloodSplatter.js';
 import { GroundRenderer } from './GroundRenderer.js';
-import { GroundLightingFilter } from './shaders/GroundLightingFilter.js';
 import { NpcLightingFilter } from './shaders/NpcLightingFilter.js';
 import { ScreenEffects } from './effects/ScreenEffects.js';
 
@@ -70,18 +69,12 @@ export class Game {
     this._setupInput();
     this._setupResize();
 
-    // 法线地砖地面
-    const { ground, normalTex } = GroundRenderer.create(this.app.screen.width, this.app.screen.height);
-    this._ground = ground;
-    this._groundNormalTex = normalTex;
-    this._groundFilter = new GroundLightingFilter(
-      this.mouseX, this.mouseY, this.visionRadius,
-      this.app.screen.width, this.app.screen.height, normalTex,
-      256, 1.5
-    );
-    this._ground.filters = [this._groundFilter];
-    this._ground.filterArea = new PIXI.Rectangle(0, 0, this.app.screen.width, this.app.screen.height);
-    this.layers.background.addChild(this._ground);
+    // 法线地砖地面（自定义 Shader Mesh，非 Filter）
+    const { mesh: groundMesh, shader: groundShader } = GroundRenderer.create(
+      this.app.screen.width, this.app.screen.height);
+    this._groundMesh = groundMesh;
+    this._groundShader = groundShader;
+    this.layers.background.addChild(this._groundMesh);
 
     // 血浆粒子系统
     this.bloodSplatter = new BloodSplatter(this.layers.bloodLayer);
@@ -187,11 +180,13 @@ export class Game {
       this.vision.resize(w, h, keepRadius ? this.vision.currentRadius : this.visionRadius);
 
       this.layers.background.removeChildren();
-      this._ground.width = w;
-      this._ground.height = h;
-      this.layers.background.addChild(this._ground);
-      this._groundFilter.update(this.mouseX, this.mouseY, this.vision.currentRadius, w, h);
-      this._ground.filterArea = new PIXI.Rectangle(0, 0, w, h);
+      const { mesh: newGroundMesh, shader: newGroundShader } = GroundRenderer.create(w, h);
+      this._groundMesh = newGroundMesh;
+      this._groundShader = newGroundShader;
+      this.layers.background.addChild(this._groundMesh);
+      this._groundShader.uniforms.uLightPos[0] = this.mouseX;
+      this._groundShader.uniforms.uLightPos[1] = this.mouseY;
+      this._groundShader.uniforms.uLightRadius = this.vision.currentRadius;
       this.screenEffects.resize(w, h);
     });
   }
@@ -317,8 +312,10 @@ export class Game {
     this.hearts.update(dtMs);
 
     // --- 更新地面光照 filter ---
-    this._groundFilter.update(this.mouseX, this.mouseY, this.vision.currentRadius,
-      this.app.screen.width, this.app.screen.height);
+    this._groundShader.uniforms.uLightPos[0] = this.mouseX;
+    this._groundShader.uniforms.uLightPos[1] = this.mouseY;
+    this._groundShader.uniforms.uLightRadius = this.vision.currentRadius;
+    this._groundShader.uniforms.uTilePx = 256 / 1.5;
 
     // --- NPC visibility & timer ---
     const npcInVision = this.npc.isInVision(this.vision);
