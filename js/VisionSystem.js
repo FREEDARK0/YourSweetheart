@@ -1,9 +1,36 @@
-import { LightingFilter } from './shaders/LightingFilter.js';
-
 /**
- * 手电筒视野系统 — 使用自定义 GLSL Shader 实现软边光照衰减。
- * 黑暗遮罩使用 PIXI.Mesh + 显式顶点坐标，彻底杜绝 Sprite/filterArea 的 DPR 坐标偏移。
+ * 手电筒视野系统 — 使用预渲染径向渐变纹理作为 Sprite Mask，
+ * 遮罩和光环都在 PixiJS CSS-pixel 坐标系统内，无 shader 坐标归一化问题。
  */
+
+const GRADIENT_TEX_SIZE = 1024; // texture covers up to 512px radius
+
+function createGradientTex() {
+  const size = GRADIENT_TEX_SIZE;
+  const half = size / 2;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+
+  const gradient = ctx.createRadialGradient(half, half, 0, half, half, half);
+  gradient.addColorStop(0,   'rgba(255,255,255,0)');
+  gradient.addColorStop(0.2, 'rgba(255,255,255,0.06)');
+  gradient.addColorStop(0.7, 'rgba(255,255,255,0.25)');
+  gradient.addColorStop(1,   'rgba(255,255,255,1)');
+
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, size, size);
+  return PIXI.Texture.from(canvas);
+}
+
+// Singleton — all VisionSystem instances share the same gradient texture
+let _sharedGradientTex = null;
+function sharedGradientTex() {
+  if (!_sharedGradientTex) _sharedGradientTex = createGradientTex();
+  return _sharedGradientTex;
+}
+
 export class VisionSystem {
   constructor(app, overlayContainer, x, y, radius) {
     this.app = app;
@@ -20,25 +47,32 @@ export class VisionSystem {
     const w = app.screen.width;
     const h = app.screen.height;
 
-    // 全屏 Mesh — 显式指定顶点/UV，不依赖 Sprite bounds 推算
-    this.darkness = this._createMesh(w, h);
-    this.filter = new LightingFilter(x, y, radius, w, h);
-    this.darkness.filters = [this.filter];
+    // 全屏黑色遮罩（被 mask 打孔）
+    this.darkness = new PIXI.Sprite(PIXI.Texture.WHITE);
+    this.darkness.width = w;
+    this.darkness.height = h;
+    this.darkness.tint = 0x000000;
     this.container.addChild(this.darkness);
 
-    // 灰色细线环（Graphics，叠加在 shader 光圈之上）
+    // 渐变 Mask — 白色中心透明，边缘不透明
+    this._maskSprite = new PIXI.Sprite(sharedGradientTex());
+    this._maskSprite.anchor.set(0.5);
+    this._maskSprite.x = x;
+    this._maskSprite.y = y;
+    this._updateMaskScale();
+    this.container.addChild(this._maskSprite);
+    this.darkness.mask = this._maskSprite;
+
+    // 灰色细线环
     this.glowRing = new PIXI.Graphics();
     this.container.addChild(this.glowRing);
   }
 
-  _createMesh(w, h) {
-    const geometry = new PIXI.Geometry()
-      .addAttribute('aVertexPosition', [0, 0, w, 0, w, h, 0, h], 2)
-      .addAttribute('aTextureCoord', [0, 0, 1, 0, 1, 1, 0, 1], 2)
-      .addIndex([0, 1, 2, 0, 2, 3]);
-    const mesh = new PIXI.Mesh(geometry, new PIXI.MeshMaterial(PIXI.Texture.WHITE));
-    mesh.tint = 0x000000;
-    return mesh;
+  _updateMaskScale() {
+    // Gradient texture radius is GRADIENT_TEX_SIZE/2 px.
+    // Scale so that edge of gradient aligns with currentRadius.
+    const s = this.currentRadius / (GRADIENT_TEX_SIZE / 2);
+    this._maskSprite.scale.set(s);
   }
 
   update(x, y) {
@@ -51,10 +85,9 @@ export class VisionSystem {
     }
     this.radius = this.currentRadius;
 
-    const w = this.app.screen.width;
-    const h = this.app.screen.height;
-
-    this.filter.update(x, y, this.currentRadius, w, h);
+    this._maskSprite.x = x;
+    this._maskSprite.y = y;
+    this._updateMaskScale();
 
     this.glowRing.clear();
     this.glowRing.lineStyle(2, this._glowColor, this._glowAlpha);
@@ -67,15 +100,11 @@ export class VisionSystem {
     this.radius = radius;
     this.targetRadius = radius;
     this.currentRadius = radius;
-
-    // 重建 Mesh 以匹配新尺寸
-    this.container.removeChild(this.darkness);
-    this.darkness.destroy();
-    this.darkness = this._createMesh(w, h);
-    this.darkness.filters = [this.filter];
-    this.container.addChildAt(this.darkness, 0);
-
-    this.filter.update(this.x, this.y, radius, w, h);
+    this.darkness.width = w;
+    this.darkness.height = h;
+    this._maskSprite.x = this.x;
+    this._maskSprite.y = this.y;
+    this._updateMaskScale();
   }
 
   reset() {
@@ -93,9 +122,9 @@ export class VisionSystem {
     this.radius = r;
     this.currentRadius = r;
     this.targetRadius = r;
-    const w = this.app.screen.width;
-    const h = this.app.screen.height;
-    this.filter.update(this.x, this.y, r, w, h);
+    this._maskSprite.x = this.x;
+    this._maskSprite.y = this.y;
+    this._updateMaskScale();
   }
 
   setGlowColor(color, alpha) {
