@@ -21,14 +21,9 @@ export class NPC {
     this.display.x = x;
     this.display.y = y;
 
-    // 影子（半透明黑色剪影，投射在地面上）
-    this._shadow = new PIXI.Sprite(texture);
-    this._shadow.anchor.set(0.5, 0.85);
-    this._shadow.scale.set(scale);
-    this._shadow.scale.y *= 0.45; // 稍压扁模拟地面投影
-    this._shadow.tint = 0x000000;
-    this._shadow.alpha = 0.4;
-    this.display.addChild(this._shadow);
+    // 动态投射影子（Graphics 绘制）
+    this._shadowGfx = new PIXI.Graphics();
+    this.display.addChild(this._shadowGfx);
 
     // 主体精灵
     this.sprite = new PIXI.Sprite(texture);
@@ -36,7 +31,6 @@ export class NPC {
     this.sprite.scale.set(scale);
     this.display.addChild(this.sprite);
 
-    // 缓存精灵世界尺寸，供 filter 使用
     this._spriteWorldW = texture.width * scale;
     this._spriteWorldH = texture.height * scale;
   }
@@ -75,27 +69,40 @@ export class NPC {
     const dy = this.y - lightY;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
-    if (dist < 1) {
-      this._shadow.visible = false;
-      return;
-    }
+    this._shadowGfx.clear();
 
-    // 影子投射方向：远离光源，距离越近影子越长
-    const shadowLen = Math.min(90, dist * 0.65);
-    const sx = (dx / dist) * shadowLen;
-    const sy = (dy / dist) * shadowLen;
+    if (dist < 1) return;
 
-    this._shadow.x = sx;
-    this._shadow.y = sy + this._bobOffset + 8;
-    this._shadow.alpha = 0.50;
+    // 投射方向：远离光源
+    const castX = dx / dist;
+    const castY = dy / dist;
+    const castAngle = Math.atan2(castY, castX);
 
-    // 沿光源投射方向拉伸影子（不旋转，只拉伸）
-    const stretch = 1.0 + shadowLen / 50;
-    const castAngle = Math.atan2(dy, dx);
-    this._shadow.scale.x = Math.abs(this.sprite.scale.x) * (1.0 + Math.abs(Math.cos(castAngle)) * (stretch - 1.0));
-    // Y 方向：垂直压扁 + 顺投射方向的拉伸
-    const baseScaleY = Math.abs(this.sprite.scale.y) * 0.45;
-    this._shadow.scale.y = baseScaleY * (1.0 + Math.abs(Math.sin(castAngle)) * (stretch - 1.0) * 0.5);
+    // 影子长度：光源越近影子越长
+    const shadowLen = Math.min(130, 60 + 180 / Math.max(20, dist));
+
+    // 影子中心在投射方向上偏移
+    const offsetX = castX * shadowLen * 0.35;
+    const offsetY = castY * shadowLen * 0.35 + this._bobOffset + 6;
+
+    // 椭圆半宽和半高（沿投射方向拉长）
+    const halfW = shadowLen * 0.45;
+    const halfH = 18;
+
+    // 核心阴影
+    this._shadowGfx.beginFill(0x000000, 0.50);
+    this._shadowGfx.drawEllipse(offsetX, offsetY, halfW, halfH);
+    this._shadowGfx.endFill();
+
+    // 外围柔化
+    this._shadowGfx.beginFill(0x000000, 0.22);
+    this._shadowGfx.drawEllipse(offsetX, offsetY, halfW * 1.25, halfH * 1.4);
+    this._shadowGfx.endFill();
+
+    // 最外层淡出
+    this._shadowGfx.beginFill(0x000000, 0.08);
+    this._shadowGfx.drawEllipse(offsetX, offsetY, halfW * 1.5, halfH * 1.8);
+    this._shadowGfx.endFill();
   }
 
   isInVision(vision) {
