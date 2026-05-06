@@ -3,24 +3,25 @@ const fragSrc = `
   varying vec2 vTextureCoord;
   uniform sampler2D uSampler;
   uniform sampler2D uNormalMap;
-  uniform vec2 uLightPos;
-  uniform float uLightRadius;
-  uniform vec2 uInputSize;
+  uniform vec2 uLightPosNorm;
+  uniform float uLightRadiusNorm;
+  uniform float uAspect;
   uniform float uAmbient;
 
   void main() {
     vec4 texColor = texture2D(uSampler, vTextureCoord);
     vec3 normal = texture2D(uNormalMap, vTextureCoord).rgb * 2.0 - 1.0;
 
-    vec2 pixelCoord = vTextureCoord * uInputSize;
-    vec2 lightDir = uLightPos - pixelCoord;
-    float dist = length(lightDir);
-    lightDir = normalize(lightDir);
+    vec2 delta = vTextureCoord - uLightPosNorm;
+    delta.x *= uAspect;
+    float dist = length(delta);
 
-    float NdotL = max(0.0, dot(normal, vec3(lightDir, 0.0)));
-    float wrap = NdotL * 0.6 + 0.4; // wrap lighting so shadows aren't pure black
+    // 光照方向（2D，z分量从上方来）
+    vec2 lightDir2D = normalize(vec2(-delta.x, -delta.y));
+    float NdotL = max(0.0, dot(normal, vec3(lightDir2D, 0.2)));
+    float wrap = NdotL * 0.55 + 0.45;
 
-    float t = smoothstep(uLightRadius, uLightRadius * 0.3, dist);
+    float t = smoothstep(uLightRadiusNorm, uLightRadiusNorm * 0.3, dist);
     float attenuation = 1.0 - t;
 
     float light = uAmbient + (1.0 - uAmbient) * wrap * attenuation;
@@ -32,20 +33,21 @@ const fragSrc = `
 
 export class GroundLightingFilter extends PIXI.Filter {
   constructor(lightX, lightY, radius, screenW, screenH, normalTex) {
+    const minDim = Math.min(screenW, screenH);
     super(null, fragSrc, {
-      uLightPos:   new Float32Array([lightX, lightY]),
-      uLightRadius: radius,
-      uInputSize:  new Float32Array([screenW, screenH]),
-      uAmbient:    0.06,
-      uNormalMap:  normalTex,
+      uLightPosNorm:   new Float32Array([lightX / screenW, lightY / screenH]),
+      uLightRadiusNorm: radius / minDim,
+      uAspect:         screenW / Math.max(1, screenH),
+      uAmbient:        0.06,
+      uNormalMap:      normalTex,
     });
   }
 
   update(lightX, lightY, radius, screenW, screenH) {
-    this.uniforms.uLightPos[0] = lightX;
-    this.uniforms.uLightPos[1] = lightY;
-    this.uniforms.uLightRadius = radius;
-    this.uniforms.uInputSize[0] = screenW;
-    this.uniforms.uInputSize[1] = screenH;
+    const minDim = Math.min(screenW, screenH);
+    this.uniforms.uLightPosNorm[0] = lightX / screenW;
+    this.uniforms.uLightPosNorm[1] = lightY / screenH;
+    this.uniforms.uLightRadiusNorm = radius / minDim;
+    this.uniforms.uAspect = screenW / Math.max(1, screenH);
   }
 }

@@ -2,16 +2,16 @@ const fragSrc = `
   precision mediump float;
   varying vec2 vTextureCoord;
   uniform sampler2D uSampler;
-  uniform vec2 uLightPos;
-  uniform float uLightRadius;
-  uniform vec2 uInputSize;
+  uniform vec2 uLightPosNorm;
+  uniform float uLightRadiusNorm;
+  uniform float uAspect;
 
   void main() {
-    vec2 pixelCoord = vTextureCoord * uInputSize;
-    float dist = length(pixelCoord - uLightPos);
-    float t = smoothstep(uLightRadius, uLightRadius * 0.25, dist);
-    // subtle glow ring at the light edge
-    float glow = smoothstep(uLightRadius * 0.85, uLightRadius * 1.05, dist) * 0.08;
+    vec2 delta = vTextureCoord - uLightPosNorm;
+    delta.x *= uAspect;
+    float dist = length(delta);
+    float t = smoothstep(uLightRadiusNorm, uLightRadiusNorm * 0.25, dist);
+    float glow = smoothstep(uLightRadiusNorm * 0.85, uLightRadiusNorm * 1.05, dist) * 0.08;
     float alpha = max(t, glow);
     gl_FragColor = vec4(0.0, 0.0, 0.0, alpha);
   }
@@ -19,18 +19,19 @@ const fragSrc = `
 
 export class LightingFilter extends PIXI.Filter {
   constructor(lightX, lightY, radius, screenW, screenH) {
+    const minDim = Math.min(screenW, screenH);
     super(null, fragSrc, {
-      uLightPos:   new Float32Array([lightX, lightY]),
-      uLightRadius: radius,
-      uInputSize:  new Float32Array([screenW, screenH]),
+      uLightPosNorm:   new Float32Array([lightX / screenW, lightY / screenH]),
+      uLightRadiusNorm: radius / minDim,
+      uAspect:         screenW / Math.max(1, screenH),
     });
   }
 
   update(lightX, lightY, radius, screenW, screenH) {
-    this.uniforms.uLightPos[0] = lightX;
-    this.uniforms.uLightPos[1] = lightY;
-    this.uniforms.uLightRadius = radius;
-    this.uniforms.uInputSize[0] = screenW;
-    this.uniforms.uInputSize[1] = screenH;
+    const minDim = Math.min(screenW, screenH);
+    this.uniforms.uLightPosNorm[0] = lightX / screenW;
+    this.uniforms.uLightPosNorm[1] = lightY / screenH;
+    this.uniforms.uLightRadiusNorm = radius / minDim;
+    this.uniforms.uAspect = screenW / Math.max(1, screenH);
   }
 }
