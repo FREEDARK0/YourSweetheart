@@ -158,6 +158,7 @@ export class Game {
 
   _setupInput() {
     const setRaw = (cx, cy) => {
+      if (this._startDelay > 0) return; // locked during intro freeze
       const rect = this.app.view.getBoundingClientRect();
       this.rawMouseX = (cx - rect.left) * (this.app.screen.width / rect.width);
       this.rawMouseY = (cy - rect.top) * (this.app.screen.height / rect.height);
@@ -648,6 +649,9 @@ export class Game {
     this.layers.tombstoneLayer.removeChildren();
     this.layers.ghostLayer.removeChildren();
     this.bloodSplatter.clear();
+
+    // Reset AI state (prevent LOVE-state carryover from previous game)
+    this.ai.reset();
 
     // Reset texts & particles
     this.groundText.clear();

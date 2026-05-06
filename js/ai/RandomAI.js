@@ -28,6 +28,12 @@ export class RandomAI extends BaseAI {
     this._dirY = Math.sin(angle);
   }
 
+  reset() {
+    this._state = WANDER;
+    this._stateTimer = 0;
+    this._pickNewDirection();
+  }
+
   update(npc, dt, context) {
     this._stateTimer -= dt;
 
