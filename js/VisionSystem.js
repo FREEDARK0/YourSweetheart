@@ -37,14 +37,7 @@ void main() {
 
     float alpha = max(max(hotspot, cutoff), glow);
 ${logic}
-    // DIAGNOSTIC: tint everything reddish except test circle at (200,200)
-    // If you see the ENTIRE screen turn reddish, the shader is running.
-    // A normal (non-red) circle at (200,200) means vScreenPos is correct.
-    if (length(vScreenPos - vec2(200.0, 200.0)) < 120.0) {
-        gl_FragColor = vec4(0.0, 0.0, 0.0, 0.0); // transparent
-    } else {
-        gl_FragColor = vec4(0.3, 0.0, 0.0, 0.85); // reddish dark overlay
-    }
+    gl_FragColor = vec4(0.0, 0.0, 0.0, alpha);
 }
 `;
 }
@@ -54,14 +47,7 @@ const FRAGMENT_SRC = buildFragmentSrc();
 let _sharedProgram = null;
 function getProgram() {
   if (!_sharedProgram) {
-    console.log('[Vision] Fragment shader source:');
-    console.log(FRAGMENT_SRC);
-    try {
-      _sharedProgram = PIXI.Program.from(VERTEX_SRC, FRAGMENT_SRC);
-      console.log('[Vision] Program compiled OK');
-    } catch (e) {
-      console.error('[Vision] Program compilation failed:', e);
-    }
+    _sharedProgram = PIXI.Program.from(VERTEX_SRC, FRAGMENT_SRC);
   }
   return _sharedProgram;
 }
@@ -115,10 +101,8 @@ export class VisionSystem {
     for (let i = 0; i < MAX_CANDLES; i++) {
       if (i < count) {
         const c = candleList[i];
-        const pos = this._shader.uniforms[`uC${i}Pos`];
-        pos[0] = c.x;
-        pos[1] = c.y;
-        this._shader.uniforms[`uC${i}Pos`] = pos;
+        // Create NEW array each time — PixiJS uses reference (!==) to detect changes
+        this._shader.uniforms[`uC${i}Pos`] = new Float32Array([c.x, c.y]);
         this._shader.uniforms[`uC${i}Radius`] = Math.max(c.currentRadius, 0.001);
       } else {
         this._shader.uniforms[`uC${i}Radius`] = 0.001;
