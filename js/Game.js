@@ -60,6 +60,10 @@ export class Game {
     this._visionDrift = null;
     this._flyingItems = [];
 
+    // Candle inventory & placed candles
+    this.inventory = { candle: { count: 0, max: 3 } };
+    this.placedCandles = [];
+
     // Tombstones & ghosts
     this.tombstones = [];
     this.ghosts = [];
@@ -107,6 +111,7 @@ export class Game {
     this._skullTex = skullTex;
 
     this._setupTimerDisplay();
+    this._setupInventoryUI();
 
     this.app.ticker.add((delta) => this._update(delta));
   }
@@ -166,6 +171,16 @@ export class Game {
       e.preventDefault();
       setRaw(e.touches[0].clientX, e.touches[0].clientY);
     }, { passive: false });
+
+    this.app.view.addEventListener('click', () => {
+      if (this.state !== 'playing') return;
+      this._tryPlaceCandle();
+    });
+    this.app.view.addEventListener('touchend', (e) => {
+      if (this.state !== 'playing') return;
+      e.preventDefault();
+      this._tryPlaceCandle();
+    }, { passive: false });
   }
 
   // ---- Resize ----
@@ -188,6 +203,8 @@ export class Game {
       this._groundShader.uniforms.uLightPos[1] = this.mouseY;
       this._groundShader.uniforms.uLightRadius = this.vision.currentRadius;
       this.screenEffects.resize(w, h);
+      this.inventoryUI.x = w - 15;
+      this.inventoryUI.y = h - 15;
     });
   }
 
@@ -223,6 +240,9 @@ export class Game {
 
     // --- Screen post-processing ---
     this.screenEffects.update(dt);
+
+    // --- Candle lifecycle ---
+    this._updateCandles(dt);
 
     // --- Initial message ---
     if (!this._initialTextSpawned) {
@@ -303,7 +323,8 @@ export class Game {
     // --- Love state ---
     this._handleLoveState(dt, dtMs);
 
-    // --- Vision ---
+    // --- Vision (setCandles must be called before update for GPU upload) ---
+    this.vision.setCandles(this.placedCandles);
     this.vision.update(this.mouseX, this.mouseY);
 
     // --- Effects ---
@@ -318,7 +339,10 @@ export class Game {
     this._groundShader.uniforms.uTilePx = 256 / 0.75;
 
     // --- NPC visibility & timer ---
-    const npcInVision = this.npc.isInVision(this.vision);
+    const candleLights = this.placedCandles.map(c => ({
+      x: c.x, y: c.y, radius: c.currentRadius,
+    }));
+    const npcInVision = this.npc.isInVision(this.vision, candleLights);
     if (!npcInVision) {
       const rate = this._inLove ? LOVE_SLOWDOWN : 1.0;
       this.outOfVisionTimer += dtMs * rate;
@@ -329,6 +353,9 @@ export class Game {
     }
 
     this._updateTimerUI();
+
+    // --- Inventory UI ---
+    this._updateInventoryUI();
 
     if (this.outOfVisionTimer >= MAX_OUT_OF_VISION_MS) {
       this._endGame();
@@ -517,6 +544,41 @@ export class Game {
     ghost.state = 'dead';
   }
 
+  // ---- Candles ----
+
+  _tryPlaceCandle() {
+    if (this.inventory.candle.count <= 0) return;
+    this.inventory.candle.count--;
+
+    const radius = Math.max(30, this.visionRadius * 0.7);
+    this.placedCandles.push({
+      x: this.mouseX,
+      y: this.mouseY,
+      baseRadius: radius,
+      currentRadius: radius,
+      elapsed: 0,
+      state: 'stable',
+    });
+  }
+
+  _updateCandles(dt) {
+    for (let i = this.placedCandles.length - 1; i >= 0; i--) {
+      const c = this.placedCandles[i];
+      c.elapsed += dt;
+
+      if (c.elapsed >= 3.0) {
+        this.placedCandles.splice(i, 1);
+        continue;
+      }
+
+      if (c.elapsed >= 2.0) {
+        c.state = 'fading';
+        const fadeT = (c.elapsed - 2.0) / 1.0;
+        c.currentRadius = c.baseRadius * (1.0 - fadeT);
+      }
+    }
+  }
+
   // ---- Love state ----
 
   _handleLoveState(dt, dtMs) {
@@ -596,10 +658,55 @@ export class Game {
     }
   }
 
+  // ---- Inventory UI ----
+
+  _setupInventoryUI() {
+    this.inventoryUI = new PIXI.Container();
+    this.layers.uiLayer.addChild(this.inventoryUI);
+
+    // Candle slot
+    const slot = new PIXI.Container();
+
+    const icon = new PIXI.Graphics();
+    icon.beginFill(0x3a2010);
+    icon.drawRoundedRect(-3, -8, 6, 16, 1);
+    icon.endFill();
+    icon.beginFill(0xff8844);
+    icon.drawEllipse(0, -10, 2.5, 6);
+    icon.endFill();
+    icon.beginFill(0xffdd66);
+    icon.drawEllipse(0, -11.5, 1.5, 4);
+    icon.endFill();
+    slot.addChild(icon);
+
+    this._candleText = new PIXI.Text('x 0/3', {
+      fontFamily: 'Kurobara',
+      fontSize: 20,
+      fill: '#ff8844',
+      stroke: '#000000',
+      strokeThickness: 3,
+    });
+    this._candleText.anchor.set(0, 0.5);
+    this._candleText.x = 14;
+    slot.addChild(this._candleText);
+
+    this.inventoryUI.addChild(slot);
+  }
+
+  _updateInventoryUI() {
+    const s = this.inventory.candle;
+    this._candleText.text = `x ${s.count}/${s.max}`;
+    this._candleText.style.fill = s.count > 0 ? '#ff8844' : '#553322';
+
+    this.inventoryUI.x = this.app.screen.width - 15;
+    this.inventoryUI.y = this.app.screen.height - 15;
+  }
+
   _endGame() {
     this.state = 'gameover';
     this.timerText.visible = false;
     this.timerBg.visible = false;
+    this.inventoryUI.visible = false;
     this.npc.setVisible(false);
     this.hearts.stop();
     this.jumpscare.trigger();
@@ -640,6 +747,7 @@ export class Game {
     this.npc.setVisible(true);
     this.timerText.visible = true;
     this.timerBg.visible = true;
+    this.inventoryUI.visible = true;
 
     // Reset vision
     this.vision.reset();
@@ -663,6 +771,11 @@ export class Game {
     this.layers.tombstoneLayer.removeChildren();
     this.layers.ghostLayer.removeChildren();
     this.bloodSplatter.clear();
+
+    // Reset candle inventory
+    this.inventory = { candle: { count: 0, max: 3 } };
+    this.placedCandles = [];
+    this.vision.setCandles([]);
 
     // Reset AI state (prevent LOVE-state carryover from previous game)
     this.ai.reset();

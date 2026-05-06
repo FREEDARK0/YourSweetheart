@@ -106,7 +106,7 @@ export class NPC {
     this._shadowGfx.y = this._bobOffset + 8;
   }
 
-  isInVision(vision) {
+  isInVision(vision, extraLights = []) {
     const scale = Math.abs(this.sprite.scale.y);
     const halfW = this.sprite.texture.width * scale / 2;
     const h = this.sprite.texture.height * scale;
@@ -117,11 +117,23 @@ export class NPC {
     const left = this.x - halfW;
     const right = this.x + halfW;
 
+    // Main vision
     const cx = Math.max(left, Math.min(vision.x, right));
     const cy = Math.max(top, Math.min(vision.y, bottom));
     const dx = cx - vision.x;
     const dy = cy - vision.y;
-    return Math.sqrt(dx * dx + dy * dy) <= vision.currentRadius;
+    if (Math.sqrt(dx * dx + dy * dy) <= vision.currentRadius) return true;
+
+    // Candle lights
+    for (const light of extraLights) {
+      const lx = Math.max(left, Math.min(light.x, right));
+      const ly = Math.max(top, Math.min(light.y, bottom));
+      const ldx = lx - light.x;
+      const ldy = ly - light.y;
+      if (Math.sqrt(ldx * ldx + ldy * ldy) <= light.radius) return true;
+    }
+
+    return false;
   }
 
   setVisible(v) {

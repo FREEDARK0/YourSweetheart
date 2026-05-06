@@ -30,6 +30,9 @@ export class ItemEffects {
       case 'heart':
         this._activateHeart(item, ctx);
         break;
+      case 'candle':
+        this._activateCandle(item, ctx);
+        break;
     }
   }
 
@@ -59,10 +62,12 @@ export class ItemEffects {
     const roll = Math.random();
     if (roll < 0.10) {
       newType = 'box';
-    } else if (roll < 0.55) {
+    } else if (roll < 0.45) {
       newType = 'bottle';
-    } else {
+    } else if (roll < 0.75) {
       newType = 'heart';
+    } else {
+      newType = 'candle';
     }
 
     const newItem = new Item(newType, boxItem.x, boxItem.y);
@@ -133,6 +138,15 @@ export class ItemEffects {
       _targetY: game.rawMouseY,
       _changeTimer: 0, // triggers immediately on first update
     };
+  }
+
+  // ---- Candle: add to inventory ----
+  _activateCandle(item, ctx) {
+    const { game } = ctx;
+    const slot = game.inventory.candle;
+    if (slot.count < slot.max) {
+      slot.count++;
+    }
   }
 
   // ---- Heart: recover 2 seconds on failure timer ----

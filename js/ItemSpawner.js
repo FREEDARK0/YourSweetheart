@@ -98,9 +98,10 @@ export class ItemSpawner {
 
   _rollType() {
     const roll = Math.random();
-    if (roll < 0.30) return 'box';
-    if (roll < 0.65) return 'bottle';
-    return 'heart';
+    if (roll < 0.25) return 'box';
+    if (roll < 0.50) return 'bottle';
+    if (roll < 0.75) return 'heart';
+    return 'candle';
   }
 
   removeItem(item) {

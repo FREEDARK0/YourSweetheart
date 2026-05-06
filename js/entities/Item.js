@@ -6,6 +6,7 @@ const THRESHOLDS = {
   portrait: 0.5,
   bottle: 0.5,
   heart: 0.5,
+  candle: 0.5,
 };
 
 const COLORS = {
@@ -13,6 +14,7 @@ const COLORS = {
   portrait:{ main: 0x3a3a0a, accent: 0x8b8b00, glow: 0x666600 },
   bottle:  { main: 0x1a3a1a, accent: 0x228b22, glow: 0x004400 },
   heart:   { main: 0x4a0a1a, accent: 0xff3388, glow: 0x660022 },
+  candle:  { main: 0x3a2010, accent: 0xff8844, glow: 0x663300 },
 };
 
 export class Item {
@@ -94,6 +96,18 @@ export class Item {
         g.bezierCurveTo(-10 * hs, 7 * hs, -5 * hs, 9 * hs, 0, 12 * hs);
         g.bezierCurveTo(5 * hs, 9 * hs, 10 * hs, 7 * hs, 10 * hs, 3 * hs);
         g.bezierCurveTo(10 * hs, -1 * hs, 5 * hs, -5 * hs, 0, -2 * hs);
+        g.endFill();
+        break;
+      }
+      case 'candle': {
+        g.beginFill(c.main);
+        g.drawRoundedRect(-s * 0.15, -s * 0.4, s * 0.3, s * 1.0, 1);
+        g.endFill();
+        g.beginFill(c.accent);
+        g.drawEllipse(0, -s * 0.5, s * 0.12, s * 0.32);
+        g.endFill();
+        g.beginFill(0xffdd66);
+        g.drawEllipse(0, -s * 0.52, s * 0.06, s * 0.18);
         g.endFill();
         break;
       }

@@ -1,3 +1,5 @@
+const MAX_CANDLES = 8;
+
 const VERTEX_SRC = `
 attribute vec2 aVertexPosition;
 uniform mat3 projectionMatrix;
@@ -11,10 +13,14 @@ void main(void) {
 `;
 
 const FRAGMENT_SRC = `
+#define MAX_CANDLES ${MAX_CANDLES}
+
 precision mediump float;
 varying vec2 vScreenPos;
 uniform vec2 uLightPos;
 uniform float uLightRadius;
+uniform vec2 uCandlePos[MAX_CANDLES];
+uniform float uCandleRadius[MAX_CANDLES];
 
 void main() {
     vec2 delta = vScreenPos - uLightPos;
@@ -25,6 +31,15 @@ void main() {
     float glow = smoothstep(uLightRadius * 0.88, uLightRadius * 1.05, dist) * 0.06;
 
     float alpha = max(max(hotspot, cutoff), glow);
+
+    for (int i = 0; i < MAX_CANDLES; i++) {
+        vec2 cDelta = vScreenPos - uCandlePos[i];
+        float cDist = length(cDelta);
+        float r = max(uCandleRadius[i], 0.001);
+        float cAlpha = smoothstep(r * 0.55, r, cDist);
+        alpha = min(alpha, cAlpha);
+    }
+
     gl_FragColor = vec4(0.0, 0.0, 0.0, alpha);
 }
 `;
@@ -39,7 +54,7 @@ function getProgram() {
 
 /**
  * 手电筒视野系统 — 使用自定义 PIXI.Shader 直接渲染全屏 Mesh，
- * Fragment Shader 接收 CSS 像素坐标，与 Graphics 环共用同一坐标系，彻底消除 DPR 偏移。
+ * 支持多个蜡烛光源（candle apertures）。
  */
 export class VisionSystem {
   constructor(app, overlayContainer, x, y, radius) {
@@ -58,9 +73,15 @@ export class VisionSystem {
     const h = app.screen.height;
 
     this._shader = new PIXI.Shader(getProgram(), {
-      uLightPos:    new Float32Array([x, y]),
-      uLightRadius: radius,
+      uLightPos:      new Float32Array([x, y]),
+      uLightRadius:   radius,
+      uCandlePos:     new Float32Array(MAX_CANDLES * 2),
+      uCandleRadius:  new Float32Array(MAX_CANDLES),
     });
+    // Initialize inactive candle slots
+    for (let i = 0; i < MAX_CANDLES; i++) {
+      this._shader.uniforms.uCandleRadius[i] = 0.001;
+    }
 
     this.darkness = this._createMesh(w, h);
     this.container.addChild(this.darkness);
@@ -74,6 +95,27 @@ export class VisionSystem {
       .addAttribute('aVertexPosition', [0, 0, w, 0, w, h, 0, h], 2)
       .addIndex([0, 1, 2, 0, 2, 3]);
     return new PIXI.Mesh(geometry, this._shader);
+  }
+
+  /**
+   * Must be called BEFORE update() each frame.
+   * Populates candle uniform arrays; update()'s scalar assignment triggers GPU upload.
+   */
+  setCandles(candleList) {
+    const pos = this._shader.uniforms.uCandlePos;
+    const rad = this._shader.uniforms.uCandleRadius;
+    const count = Math.min(candleList.length, MAX_CANDLES);
+
+    for (let i = 0; i < count; i++) {
+      pos[i * 2] = candleList[i].x;
+      pos[i * 2 + 1] = candleList[i].y;
+      rad[i] = Math.max(candleList[i].currentRadius, 0.001);
+    }
+    for (let i = count; i < MAX_CANDLES; i++) {
+      pos[i * 2] = 0;
+      pos[i * 2 + 1] = 0;
+      rad[i] = 0.001;
+    }
   }
 
   update(x, y) {
@@ -141,5 +183,15 @@ export class VisionSystem {
     const dx = x - this.x;
     const dy = y - this.y;
     return Math.sqrt(dx * dx + dy * dy) <= this.currentRadius;
+  }
+
+  /** Check if (x,y) is inside any placed candle light. */
+  isInCandleLight(x, y, extraLights) {
+    for (const light of extraLights) {
+      const dx = x - light.x;
+      const dy = y - light.y;
+      if (Math.sqrt(dx * dx + dy * dy) <= light.radius) return true;
+    }
+    return false;
   }
 }
