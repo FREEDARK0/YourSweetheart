@@ -11,17 +11,18 @@ void main(void) {
 `;
 
 function buildFragmentSrc(candles) {
+  let uniforms = '';
   let candleLogic = '';
   for (let i = 0; i < candles.length; i++) {
     const c = candles[i];
-    const r = Math.max(c.currentRadius, 1);
-    candleLogic += `  alpha = min(alpha, smoothstep(${(r * 0.2).toFixed(1)}, ${r.toFixed(1)}, length(vScreenPos - vec2(${c.x.toFixed(1)}, ${c.y.toFixed(1)}))));\n`;
+    uniforms += `uniform float uC${i}Radius;\n`;
+    candleLogic += `  alpha = min(alpha, smoothstep(uC${i}Radius * 0.2, uC${i}Radius, length(vScreenPos - vec2(${c.x.toFixed(1)}, ${c.y.toFixed(1)}))));\n`;
   }
   return `precision mediump float;
 varying vec2 vScreenPos;
 uniform vec2 uLightPos;
 uniform float uLightRadius;
-
+${uniforms}
 void main() {
     vec2 delta = vScreenPos - uLightPos;
     float dist = length(delta);
@@ -65,10 +66,14 @@ export class VisionSystem {
 
     const fragSrc = buildFragmentSrc(candles);
     const program = new PIXI.Program(VERTEX_SRC, fragSrc);
-    this._shader = new PIXI.Shader(program, {
+    const uniforms = {
       uLightPos:    new Float32Array([x, y]),
       uLightRadius: radius,
-    });
+    };
+    for (let i = 0; i < candles.length; i++) {
+      uniforms[`uC${i}Radius`] = Math.max(candles[i].currentRadius, 1);
+    }
+    this._shader = new PIXI.Shader(program, uniforms);
 
     if (!this.darkness) {
       const geometry = new PIXI.Geometry()
@@ -77,22 +82,28 @@ export class VisionSystem {
       this.darkness = new PIXI.Mesh(geometry, this._shader);
       this.container.addChildAt(this.darkness, 0);
     } else {
-      // Hot-swap shader on existing mesh
       this.darkness.shader = this._shader;
     }
   }
 
   setCandles(candleList) {
-    this._candleRings = candleList; // for ring drawing in update()
+    this._candleRings = candleList;
 
     let hash = candleList.length;
     for (const c of candleList) {
       hash += `|${c.x.toFixed(0)},${c.y.toFixed(0)}`;
     }
-    if (hash === this._lastCandleHash) return;
-    this._lastCandleHash = hash;
-
-    this._build(this.x, this.y, this.currentRadius, candleList);
+    if (hash !== this._lastCandleHash) {
+      this._lastCandleHash = hash;
+      this._build(this.x, this.y, this.currentRadius, candleList);
+    } else {
+      // Same candles, just update radii (for shrink animation)
+      for (let i = 0; i < candleList.length; i++) {
+        try {
+          this._shader.uniforms[`uC${i}Radius`] = Math.max(candleList[i].currentRadius, 1);
+        } catch(e) {}
+      }
+    }
   }
 
   update(x, y) {
