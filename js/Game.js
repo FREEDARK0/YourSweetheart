@@ -475,7 +475,7 @@ export class Game {
         this.vision.currentRadius, this.mouseX, this.mouseY);
 
       const inVision = this.vision.isInVision(g.x, g.y);
-      const nearPlayer = Math.hypot(g.x - this.mouseX, g.y - this.mouseY) <= 150;
+      const nearPlayer = Math.hypot(g.x - this.mouseX, g.y - this.mouseY) <= 120;
       g.setVisible(inVision || nearPlayer || g.state === 'attacking' || g.state === 'exploding');
 
       if (result && result.type === 'ghostExplode') {

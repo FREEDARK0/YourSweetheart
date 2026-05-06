@@ -59,9 +59,7 @@ export class ItemEffects {
     const roll = Math.random();
     if (roll < 0.10) {
       newType = 'box';
-    } else if (roll < 0.40) {
-      newType = 'portrait';
-    } else if (roll < 0.70) {
+    } else if (roll < 0.55) {
       newType = 'bottle';
     } else {
       newType = 'heart';

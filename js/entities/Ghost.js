@@ -1,7 +1,7 @@
 const SKULL_WIDTH = 48;
 const GHOST_SPEED = 70;
 const ATTACK_DURATION = 0.6;
-const EXPLOSION_RADIUS = 150;
+const EXPLOSION_RADIUS = 120;
 const TRAIL_LENGTH = 14;
 
 export class Ghost {
