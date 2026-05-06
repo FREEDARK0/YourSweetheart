@@ -36,7 +36,7 @@ void main() {
         vec2 cDelta = vScreenPos - uCandlePos[i];
         float cDist = length(cDelta);
         float r = max(uCandleRadius[i], 0.001);
-        float cAlpha = smoothstep(r * 0.55, r, cDist);
+        float cAlpha = smoothstep(r * 0.2, r, cDist);
         alpha = min(alpha, cAlpha);
     }
 
@@ -102,8 +102,8 @@ export class VisionSystem {
    * Populates candle uniform arrays; update()'s scalar assignment triggers GPU upload.
    */
   setCandles(candleList) {
-    const pos = this._shader.uniforms.uCandlePos;
-    const rad = this._shader.uniforms.uCandleRadius;
+    const pos = new Float32Array(MAX_CANDLES * 2);
+    const rad = new Float32Array(MAX_CANDLES);
     const count = Math.min(candleList.length, MAX_CANDLES);
 
     for (let i = 0; i < count; i++) {
@@ -112,10 +112,11 @@ export class VisionSystem {
       rad[i] = Math.max(candleList[i].currentRadius, 0.001);
     }
     for (let i = count; i < MAX_CANDLES; i++) {
-      pos[i * 2] = 0;
-      pos[i * 2 + 1] = 0;
       rad[i] = 0.001;
     }
+    // Assign new arrays to trigger PixiJS uniform dirty flag → GPU upload
+    this._shader.uniforms.uCandlePos = pos;
+    this._shader.uniforms.uCandleRadius = rad;
   }
 
   update(x, y) {

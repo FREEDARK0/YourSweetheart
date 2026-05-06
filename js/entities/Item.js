@@ -101,13 +101,13 @@ export class Item {
       }
       case 'candle': {
         g.beginFill(c.main);
-        g.drawRoundedRect(-s * 0.15, -s * 0.4, s * 0.3, s * 1.0, 1);
+        g.drawRoundedRect(-s * 0.25, -s * 0.6, s * 0.5, s * 1.5, 1);
         g.endFill();
         g.beginFill(c.accent);
-        g.drawEllipse(0, -s * 0.5, s * 0.12, s * 0.32);
+        g.drawEllipse(0, -s * 0.8, s * 0.2, s * 0.5);
         g.endFill();
         g.beginFill(0xffdd66);
-        g.drawEllipse(0, -s * 0.52, s * 0.06, s * 0.18);
+        g.drawEllipse(0, -s * 0.82, s * 0.1, s * 0.28);
         g.endFill();
         break;
       }
