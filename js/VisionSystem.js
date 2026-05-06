@@ -2,7 +2,7 @@ import { LightingFilter } from './shaders/LightingFilter.js';
 
 /**
  * 手电筒视野系统 — 使用自定义 GLSL Shader 实现软边光照衰减。
- * 替换了旧的 Graphics beginHole/endHole 硬边挖孔。
+ * 黑暗遮罩使用 Sprite + Texture.WHITE，避免 Graphics.filterArea 的 DPR 坐标偏移问题。
  */
 export class VisionSystem {
   constructor(app, overlayContainer, x, y, radius) {
@@ -20,20 +20,19 @@ export class VisionSystem {
     const w = app.screen.width;
     const h = app.screen.height;
 
-    // 全屏黑色遮罩
-    this.darkness = new PIXI.Graphics();
-    this.darkness.beginFill(0x000000, 0.97);
-    this.darkness.drawRect(0, 0, w, h);
-    this.darkness.endFill();
+    // 全屏黑色遮罩（Sprite，避免 Graphics filterArea 的 DPR 坐标偏移）
+    this.darkness = new PIXI.Sprite(PIXI.Texture.WHITE);
+    this.darkness.width = w;
+    this.darkness.height = h;
+    this.darkness.tint = 0x000000;
 
     // 应用 shader 光照过滤器
     this.filter = new LightingFilter(x, y, radius, w, h);
     this.darkness.filters = [this.filter];
-    this.darkness.filterArea = new PIXI.Rectangle(0, 0, w, h);
 
     this.container.addChild(this.darkness);
 
-    // 软辉光环（保留 Graphics 绘制，叠加在 shader 之上）
+    // 软辉光环（Graphics 绘制，叠加在 shader 光圈之上）
     this.glowRing = new PIXI.Graphics();
     this.container.addChild(this.glowRing);
   }
@@ -66,11 +65,8 @@ export class VisionSystem {
     this.radius = radius;
     this.targetRadius = radius;
     this.currentRadius = radius;
-    this.darkness.clear();
-    this.darkness.beginFill(0x000000, 0.97);
-    this.darkness.drawRect(0, 0, w, h);
-    this.darkness.endFill();
-    this.darkness.filterArea = new PIXI.Rectangle(0, 0, w, h);
+    this.darkness.width = w;
+    this.darkness.height = h;
     this.filter.update(this.x, this.y, radius, w, h);
   }
 
