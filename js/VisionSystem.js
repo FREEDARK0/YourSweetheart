@@ -65,9 +65,8 @@ export class VisionSystem {
     const fragSrc = buildFragmentSrc(candles);
     console.log('[Vision] _build called, candles:', candles.length,
       'fragSrc has candle logic:', fragSrc.includes('smoothstep'));
-    const program = PIXI.Program.from(VERTEX_SRC, fragSrc);
-    console.log('[Vision] program created, fragSrc length:', fragSrc.length);
-    this._shader = new PIXI.Shader(program, {
+    console.log('[Vision] rebuilding shader, fragSrc length:', fragSrc.length);
+    this._shader = PIXI.Shader.from(VERTEX_SRC, fragSrc, {
       uLightPos:    new Float32Array([x, y]),
       uLightRadius: radius,
     });
