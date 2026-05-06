@@ -1,8 +1,45 @@
-import { LightingFilter } from './shaders/LightingFilter.js';
+const VERTEX_SRC = `
+attribute vec2 aVertexPosition;
+uniform mat3 projectionMatrix;
+uniform mat3 translationMatrix;
+varying vec2 vScreenPos;
+
+void main(void) {
+    gl_Position = vec4((projectionMatrix * translationMatrix * vec3(aVertexPosition, 1.0)).xy, 0.0, 1.0);
+    vScreenPos = aVertexPosition;
+}
+`;
+
+const FRAGMENT_SRC = `
+precision mediump float;
+varying vec2 vScreenPos;
+uniform vec2 uLightPos;
+uniform float uLightRadius;
+
+void main() {
+    vec2 delta = vScreenPos - uLightPos;
+    float dist = length(delta);
+
+    float hotspot = smoothstep(0.0, uLightRadius * 0.7, dist) * 0.10;
+    float cutoff = smoothstep(uLightRadius * 0.2, uLightRadius, dist);
+    float glow = smoothstep(uLightRadius * 0.88, uLightRadius * 1.05, dist) * 0.06;
+
+    float alpha = max(max(hotspot, cutoff), glow);
+    gl_FragColor = vec4(0.0, 0.0, 0.0, alpha);
+}
+`;
+
+let _sharedProgram = null;
+function getProgram() {
+  if (!_sharedProgram) {
+    _sharedProgram = PIXI.Program.from(VERTEX_SRC, FRAGMENT_SRC);
+  }
+  return _sharedProgram;
+}
 
 /**
- * 手电筒视野系统 — 使用自定义 GLSL Shader 实现软边光照衰减。
- * 黑暗遮罩使用 PIXI.Mesh + 显式顶点坐标，彻底杜绝 Sprite/filterArea 的 DPR 坐标偏移。
+ * 手电筒视野系统 — 使用自定义 PIXI.Shader 直接渲染全屏 Mesh，
+ * Fragment Shader 接收 CSS 像素坐标，与 Graphics 环共用同一坐标系，彻底消除 DPR 偏移。
  */
 export class VisionSystem {
   constructor(app, overlayContainer, x, y, radius) {
@@ -20,13 +57,14 @@ export class VisionSystem {
     const w = app.screen.width;
     const h = app.screen.height;
 
-    // 全屏 Mesh — 显式指定顶点/UV，不依赖 Sprite bounds 推算
+    this._shader = new PIXI.Shader(getProgram(), {
+      uLightPos:    new Float32Array([x, y]),
+      uLightRadius: radius,
+    });
+
     this.darkness = this._createMesh(w, h);
-    this.filter = new LightingFilter(x, y, radius, w, h);
-    this.darkness.filters = [this.filter];
     this.container.addChild(this.darkness);
 
-    // 灰色细线环（Graphics，叠加在 shader 光圈之上）
     this.glowRing = new PIXI.Graphics();
     this.container.addChild(this.glowRing);
   }
@@ -34,12 +72,8 @@ export class VisionSystem {
   _createMesh(w, h) {
     const geometry = new PIXI.Geometry()
       .addAttribute('aVertexPosition', [0, 0, w, 0, w, h, 0, h], 2)
-      .addAttribute('aTextureCoord', [0, 0, 1, 0, 1, 1, 0, 1], 2)
       .addIndex([0, 1, 2, 0, 2, 3]);
-    const mesh = new PIXI.Mesh(geometry, new PIXI.MeshMaterial(PIXI.Texture.WHITE));
-    mesh.tint = 0x000000;
-    mesh.filterArea = new PIXI.Rectangle(0, 0, w, h);
-    return mesh;
+    return new PIXI.Mesh(geometry, this._shader);
   }
 
   update(x, y) {
@@ -52,10 +86,9 @@ export class VisionSystem {
     }
     this.radius = this.currentRadius;
 
-    const w = this.app.screen.width;
-    const h = this.app.screen.height;
-
-    this.filter.update(x, y, this.currentRadius, w, h);
+    this._shader.uniforms.uLightPos[0] = x;
+    this._shader.uniforms.uLightPos[1] = y;
+    this._shader.uniforms.uLightRadius = this.currentRadius;
 
     this.glowRing.clear();
     this.glowRing.lineStyle(2, this._glowColor, this._glowAlpha);
@@ -69,14 +102,14 @@ export class VisionSystem {
     this.targetRadius = radius;
     this.currentRadius = radius;
 
-    // 重建 Mesh 以匹配新尺寸
     this.container.removeChild(this.darkness);
     this.darkness.destroy();
     this.darkness = this._createMesh(w, h);
-    this.darkness.filters = [this.filter];
     this.container.addChildAt(this.darkness, 0);
 
-    this.filter.update(this.x, this.y, radius, w, h);
+    this._shader.uniforms.uLightPos[0] = this.x;
+    this._shader.uniforms.uLightPos[1] = this.y;
+    this._shader.uniforms.uLightRadius = radius;
   }
 
   reset() {
@@ -94,9 +127,9 @@ export class VisionSystem {
     this.radius = r;
     this.currentRadius = r;
     this.targetRadius = r;
-    const w = this.app.screen.width;
-    const h = this.app.screen.height;
-    this.filter.update(this.x, this.y, r, w, h);
+    this._shader.uniforms.uLightPos[0] = this.x;
+    this._shader.uniforms.uLightPos[1] = this.y;
+    this._shader.uniforms.uLightRadius = r;
   }
 
   setGlowColor(color, alpha) {
