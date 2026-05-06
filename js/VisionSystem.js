@@ -66,19 +66,6 @@ function buildUniforms(x, y, radius) {
 
 export class VisionSystem {
   constructor(app, overlayContainer, x, y, radius) {
-    // Log active uniforms from the compiled shader
-    try {
-      const gl = app.renderer.gl;
-      const prog = getProgram()._program;
-      if (gl && prog) {
-        const count = gl.getProgramParameter(prog, gl.ACTIVE_UNIFORMS);
-        console.log('[Vision] Active uniforms in program:', count);
-        for (let i = 0; i < count; i++) {
-          const info = gl.getActiveUniform(prog, i);
-          console.log(`[Vision]   ${i}: ${info.name} size=${info.size} type=${info.type}`);
-        }
-      }
-    } catch(e) { console.error('[Vision]', e); }
     this.app = app;
     this.container = overlayContainer;
     this.radius = radius;
@@ -133,6 +120,26 @@ export class VisionSystem {
   }
 
   update(x, y) {
+    // One-time diagnostic: log WebGL active uniforms
+    if (!this._logged) {
+      this._logged = true;
+      try {
+        const gl = this.app.renderer.gl;
+        const prog = getProgram();
+        const wp = prog.program || prog._program;
+        if (gl && wp) {
+          const count = gl.getProgramParameter(wp, gl.ACTIVE_UNIFORMS);
+          console.log('[Vision] Active uniforms in program:', count);
+          for (let i = 0; i < count; i++) {
+            const info = gl.getActiveUniform(wp, i);
+            console.log(`[Vision]   ${i}: ${info.name} size=${info.size} type=${info.type}`);
+          }
+        } else {
+          console.log('[Vision] gl or program not ready', !!gl, !!wp);
+        }
+      } catch(e) { console.error('[Vision] error:', e); }
+    }
+
     this.x = x;
     this.y = y;
 
