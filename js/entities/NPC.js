@@ -70,55 +70,36 @@ export class NPC {
     const dist = Math.sqrt(dx * dx + dy * dy);
 
     this._shadowGfx.clear();
-
     if (dist < 1) return;
 
-    const toLightAngle = Math.atan2(dy, dx);
+    // 鼠标↔NPC 方向
+    const dirX = dx / dist;
+    const dirY = dy / dist;
+    const angle = Math.atan2(dy, dx);
 
-    // 梯形长度（3x）
-    const shadowLen = Math.min(780, 180 + dist * 2.1);
+    // 拉伸/偏移程度：0（鼠标紧贴）→ 1（鼠标很远）
+    const t = Math.min(1.0, dist / 350);
 
-    const baseHalfW = 36;
-    const tipHalfW  = 16;
-    // 根部椭圆宽度比梯形底宽稍大，防止棱角露出
-    const rootHalfW = baseHalfW * 1.15;
-    const rootHalfH = 12;
+    // 椭圆沿鼠标方向拉长
+    const halfW = 26 + t * 55;
+    const halfH = 12 + t * 1;
 
-    // ── 统一形状：椭圆根部 + 梯形延伸（三层渐变，每层内形状相同） ──
+    // 椭圆中心向鼠标方向偏移
+    const offsetX = dirX * t * 28;
+    const offsetY = dirY * t * 28;
 
-    // 外层柔化
-    this._shadowGfx.beginFill(0x000000, 0.18);
-    this._shadowGfx.drawEllipse(0, 0, rootHalfW * 1.35, rootHalfH * 1.35);
-    this._shadowGfx.moveTo(-baseHalfW * 1.3, 0);
-    this._shadowGfx.lineTo( baseHalfW * 1.3, 0);
-    this._shadowGfx.lineTo( tipHalfW * 1.6, -shadowLen);
-    this._shadowGfx.lineTo(-tipHalfW * 1.6, -shadowLen);
-    this._shadowGfx.closePath();
+    // 两层渐变
+    this._shadowGfx.beginFill(0x000000, 0.30);
+    this._shadowGfx.drawEllipse(0, 0, halfW * 1.2, halfH * 1.6);
     this._shadowGfx.endFill();
 
-    // 中层过渡
-    this._shadowGfx.beginFill(0x000000, 0.50);
-    this._shadowGfx.drawEllipse(0, 0, rootHalfW * 1.1, rootHalfH * 1.1);
-    this._shadowGfx.moveTo(-baseHalfW * 1.08, 0);
-    this._shadowGfx.lineTo( baseHalfW * 1.08, 0);
-    this._shadowGfx.lineTo( tipHalfW * 1.2, -shadowLen);
-    this._shadowGfx.lineTo(-tipHalfW * 1.2, -shadowLen);
-    this._shadowGfx.closePath();
+    this._shadowGfx.beginFill(0x000000, 0.55);
+    this._shadowGfx.drawEllipse(0, 0, halfW, halfH);
     this._shadowGfx.endFill();
 
-    // 核心浓黑
-    this._shadowGfx.beginFill(0x000000, 0.82);
-    this._shadowGfx.drawEllipse(0, 0, rootHalfW, rootHalfH);
-    this._shadowGfx.moveTo(-baseHalfW, 0);
-    this._shadowGfx.lineTo( baseHalfW, 0);
-    this._shadowGfx.lineTo( tipHalfW, -shadowLen);
-    this._shadowGfx.lineTo(-tipHalfW, -shadowLen);
-    this._shadowGfx.closePath();
-    this._shadowGfx.endFill();
-
-    this._shadowGfx.rotation = toLightAngle - Math.PI / 2;
-    this._shadowGfx.x = 0;
-    this._shadowGfx.y = this._bobOffset + 6;
+    this._shadowGfx.rotation = angle;
+    this._shadowGfx.x = offsetX;
+    this._shadowGfx.y = offsetY + this._bobOffset + 8;
   }
 
   isInVision(vision) {
