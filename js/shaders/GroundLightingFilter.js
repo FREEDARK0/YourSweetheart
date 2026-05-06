@@ -51,25 +51,24 @@ const fragSrc = `
 
 export class GroundLightingFilter extends PIXI.Filter {
   constructor(lightX, lightY, radius, screenW, screenH, normalTex, tileSize, tileScale) {
-    const minDim = Math.min(screenW, screenH);
     super(null, fragSrc, {
       uLightPosNorm:   new Float32Array([lightX / screenW, lightY / screenH]),
-      uLightRadiusNorm: radius / minDim,
+      uLightRadiusNorm: radius / Math.max(1, screenH),
       uAspect:         screenW / Math.max(1, screenH),
       uAmbient:        0.03,
       uNormalMap:      normalTex,
       uScreenSize:     new Float32Array([screenW, screenH]),
       uTilePx:         tileSize / tileScale,
     });
+    this.padding = 0;
     this._tileSize = tileSize;
     this._tileScale = tileScale;
   }
 
   update(lightX, lightY, radius, screenW, screenH) {
-    const minDim = Math.min(screenW, screenH);
     this.uniforms.uLightPosNorm[0] = lightX / screenW;
     this.uniforms.uLightPosNorm[1] = lightY / screenH;
-    this.uniforms.uLightRadiusNorm = radius / minDim;
+    this.uniforms.uLightRadiusNorm = radius / Math.max(1, screenH);
     this.uniforms.uAspect = screenW / Math.max(1, screenH);
     this.uniforms.uScreenSize[0] = screenW;
     this.uniforms.uScreenSize[1] = screenH;

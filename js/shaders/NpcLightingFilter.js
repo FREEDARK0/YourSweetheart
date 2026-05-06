@@ -41,6 +41,7 @@ export class NpcLightingFilter extends PIXI.Filter {
       uLightPos:        new Float32Array([lightX, lightY]),
       uLightRadius:     lightRadius,
     });
+    this.padding = 0;
   }
 
   update(npcX, npcY, spriteW, spriteH, lightX, lightY, lightRadius) {
