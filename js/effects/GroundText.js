@@ -29,7 +29,7 @@ export class GroundText {
     const aboveOverlay = opts.visibleOutsideVision || false;
 
     const text = new PIXI.Text(content, {
-      fontFamily: 'serif',
+      fontFamily: 'Kurobara',
       fontSize,
       fill: '#cc0000',
       fontWeight: 'bold',

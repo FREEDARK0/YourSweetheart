@@ -73,7 +73,7 @@ export class JumpscareManager {
 
     // Text
     this.scareText = new PIXI.Text('捉到你了 ♥', {
-      fontFamily: 'serif',
+      fontFamily: 'Kurobara',
       fontSize: 48,
       fill: '#ff1111',
       fontWeight: 'bold',
@@ -100,7 +100,7 @@ export class JumpscareManager {
     this.restartBtn.addChild(btnBg);
 
     const btnText = new PIXI.Text('重新开始', {
-      fontFamily: 'sans-serif',
+      fontFamily: 'Kurobara',
       fontSize: 20,
       fill: '#cc3333',
     });

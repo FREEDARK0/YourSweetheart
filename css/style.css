@@ -16,6 +16,11 @@ html, body {
   touch-action: none;
 }
 
+@font-face {
+  font-family: 'Kurobara';
+  src: url('../assets/kurobara-gothic-light.ttf') format('truetype');
+}
+
 canvas {
   display: block;
 }

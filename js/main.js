@@ -1,6 +1,9 @@
 import { Game } from './Game.js';
 
 (async () => {
+  // Load custom font before anything renders
+  await document.fonts.load('16px Kurobara');
+
   const app = new PIXI.Application({
     width: window.innerWidth,
     height: window.innerHeight,

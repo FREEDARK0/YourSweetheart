@@ -202,7 +202,7 @@ export class Game {
     this.layers.uiLayer.addChild(this.timerBg);
 
     this.timerText = new PIXI.Text('', {
-      fontFamily: 'Courier New, monospace',
+      fontFamily: 'Kurobara',
       fontSize: 28,
       fill: '#ff3333',
       fontWeight: 'bold',

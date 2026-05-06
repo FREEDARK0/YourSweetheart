@@ -32,7 +32,7 @@ export class Tombstone {
 
     // R.I.P. text
     const text = new PIXI.Text('RIP', {
-      fontFamily: 'serif',
+      fontFamily: 'Kurobara',
       fontSize: 7,
       fill: '#333333',
       fontWeight: 'bold',
