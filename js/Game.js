@@ -667,6 +667,16 @@ export class Game {
     // Candle slot
     const slot = new PIXI.Container();
 
+    this._candleText = new PIXI.Text('x 0/3', {
+      fontFamily: 'Kurobara',
+      fontSize: 24,
+      fill: '#ff8844',
+      stroke: '#000000',
+      strokeThickness: 3,
+    });
+    this._candleText.anchor.set(1, 0.5);
+    slot.addChild(this._candleText);
+
     const icon = new PIXI.Graphics();
     icon.beginFill(0x3a2010);
     icon.drawRoundedRect(-5, -14, 10, 28, 2);
@@ -677,18 +687,8 @@ export class Game {
     icon.beginFill(0xffdd66);
     icon.drawEllipse(0, -20, 2.5, 7);
     icon.endFill();
+    icon.x = -24;
     slot.addChild(icon);
-
-    this._candleText = new PIXI.Text('x 0/3', {
-      fontFamily: 'Kurobara',
-      fontSize: 24,
-      fill: '#ff8844',
-      stroke: '#000000',
-      strokeThickness: 3,
-    });
-    this._candleText.anchor.set(0, 0.5);
-    this._candleText.x = 20;
-    slot.addChild(this._candleText);
 
     this.inventoryUI.addChild(slot);
   }
