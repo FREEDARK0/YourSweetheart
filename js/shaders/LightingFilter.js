@@ -27,19 +27,17 @@ const fragSrc = `
 
 export class LightingFilter extends PIXI.Filter {
   constructor(lightX, lightY, radius, screenW, screenH) {
-    const minDim = Math.min(screenW, screenH);
     super(null, fragSrc, {
       uLightPosNorm:   new Float32Array([lightX / screenW, lightY / screenH]),
-      uLightRadiusNorm: radius / minDim,
+      uLightRadiusNorm: radius / Math.max(1, screenH),
       uAspect:         screenW / Math.max(1, screenH),
     });
   }
 
   update(lightX, lightY, radius, screenW, screenH) {
-    const minDim = Math.min(screenW, screenH);
     this.uniforms.uLightPosNorm[0] = lightX / screenW;
     this.uniforms.uLightPosNorm[1] = lightY / screenH;
-    this.uniforms.uLightRadiusNorm = radius / minDim;
+    this.uniforms.uLightRadiusNorm = radius / Math.max(1, screenH);
     this.uniforms.uAspect = screenW / Math.max(1, screenH);
   }
 }
