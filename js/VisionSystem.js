@@ -38,6 +38,7 @@ export class VisionSystem {
       .addIndex([0, 1, 2, 0, 2, 3]);
     const mesh = new PIXI.Mesh(geometry, new PIXI.MeshMaterial(PIXI.Texture.WHITE));
     mesh.tint = 0x000000;
+    mesh.filterArea = new PIXI.Rectangle(0, 0, w, h);
     return mesh;
   }
 

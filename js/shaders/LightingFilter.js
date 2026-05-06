@@ -32,6 +32,7 @@ export class LightingFilter extends PIXI.Filter {
       uLightRadiusNorm: radius / Math.max(1, screenH),
       uAspect:         screenW / Math.max(1, screenH),
     });
+    this.padding = 0; // 禁用 padding，避免 vTextureCoord 偏移
   }
 
   update(lightX, lightY, radius, screenW, screenH) {
