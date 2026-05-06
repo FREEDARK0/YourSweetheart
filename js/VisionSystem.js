@@ -11,28 +11,12 @@ void main(void) {
 `;
 
 function buildFragmentSrc(candles) {
-  // DIAGNOSTIC: if candles present, replace entire output with red tint to verify hot-swap
-  if (candles.length > 0) {
-    return `precision mediump float;
-varying vec2 vScreenPos;
-uniform vec2 uLightPos;
-uniform float uLightRadius;
-
-void main() {
-    // Draw main vision aperture as transparent, everything else reddish
-    vec2 delta = vScreenPos - uLightPos;
-    float dist = length(delta);
-    float hotspot = smoothstep(0.0, uLightRadius * 0.7, dist) * 0.10;
-    float cutoff = smoothstep(uLightRadius * 0.2, uLightRadius, dist);
-    float glow = smoothstep(uLightRadius * 0.88, uLightRadius * 1.05, dist) * 0.06;
-    float alpha = max(max(hotspot, cutoff), glow);
-    // Candle aperture: transparent circle
-    alpha = min(alpha, smoothstep(${(candles[0].currentRadius * 0.2).toFixed(1)}, ${candles[0].currentRadius.toFixed(1)}, length(vScreenPos - vec2(${candles[0].x.toFixed(1)}, ${candles[0].y.toFixed(1)}))));
-    // Red tint where opaque
-    gl_FragColor = vec4(0.3, 0.0, 0.0, 0.7 + alpha * 0.3);
-}`;
+  let candleLogic = '';
+  for (let i = 0; i < candles.length; i++) {
+    const c = candles[i];
+    const r = Math.max(c.currentRadius, 1);
+    candleLogic += `  alpha = min(alpha, smoothstep(${(r * 0.2).toFixed(1)}, ${r.toFixed(1)}, length(vScreenPos - vec2(${c.x.toFixed(1)}, ${c.y.toFixed(1)}))));\n`;
   }
-  // No candles: normal shader
   return `precision mediump float;
 varying vec2 vScreenPos;
 uniform vec2 uLightPos;
@@ -45,6 +29,7 @@ void main() {
     float cutoff = smoothstep(uLightRadius * 0.2, uLightRadius, dist);
     float glow = smoothstep(uLightRadius * 0.88, uLightRadius * 1.05, dist) * 0.06;
     float alpha = max(max(hotspot, cutoff), glow);
+${candleLogic}
     gl_FragColor = vec4(0.0, 0.0, 0.0, alpha);
 }`;
 }
@@ -97,7 +82,8 @@ export class VisionSystem {
   }
 
   setCandles(candleList) {
-    // Only rebuild when candle count or positions change (not radius which animates)
+    this._candleRings = candleList; // for ring drawing in update()
+
     let hash = candleList.length;
     for (const c of candleList) {
       hash += `|${c.x.toFixed(0)},${c.y.toFixed(0)}`;
@@ -123,10 +109,18 @@ export class VisionSystem {
     this._shader.uniforms.uLightRadius = this.currentRadius;
 
     this.glowRing.clear();
+    // Main vision ring (gray)
     this.glowRing.lineStyle(2, this._glowColor, this._glowAlpha);
     this.glowRing.drawCircle(x, y, this.currentRadius);
     this.glowRing.lineStyle(1, this._glowColor, this._glowAlpha * 0.5);
     this.glowRing.drawCircle(x, y, this.currentRadius + 3);
+    // Candle rings (orange)
+    if (this._candleRings) {
+      for (const c of this._candleRings) {
+        this.glowRing.lineStyle(2, 0xff8844, 0.4);
+        this.glowRing.drawCircle(c.x, c.y, c.currentRadius);
+      }
+    }
   }
 
   resize(w, h, radius) {
