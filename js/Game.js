@@ -12,6 +12,7 @@ import { BloodSplatter } from './effects/BloodSplatter.js';
 import { GroundRenderer } from './GroundRenderer.js';
 import { GroundLightingFilter } from './shaders/GroundLightingFilter.js';
 import { NpcLightingFilter } from './shaders/NpcLightingFilter.js';
+import { ScreenEffects } from './effects/ScreenEffects.js';
 
 const MAX_OUT_OF_VISION_MS = 6000;
 const WARNING_THRESHOLD_MS = 2000;
@@ -95,6 +96,10 @@ export class Game {
       0.5, 0.85, this.mouseX, this.mouseY, this._npcLightRadius
     );
     this.npc.sprite.filters = [this._npcFilter];
+
+    // Screen post-processing
+    this.screenEffects = new ScreenEffects(this.app);
+    this.screenEffects.enable('crt');
 
     this.groundText = new GroundText(this.layers.groundTextLayer, this.layers.groundTextOverlay);
     this.hearts = new HeartParticles(this.layers.particleLayer);
@@ -186,6 +191,7 @@ export class Game {
       this.layers.background.addChild(this._ground);
       this._groundFilter.update(this.mouseX, this.mouseY, this.vision.currentRadius, w, h);
       this._ground.filterArea = new PIXI.Rectangle(0, 0, w, h);
+      this.screenEffects.resize(w, h);
     });
   }
 
@@ -218,6 +224,9 @@ export class Game {
 
     // --- Compute effective mouse position ---
     this._updateMousePosition(dt);
+
+    // --- Screen post-processing ---
+    this.screenEffects.update(dt);
 
     // --- Initial message ---
     if (!this._initialTextSpawned) {

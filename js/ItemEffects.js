@@ -122,15 +122,16 @@ export class ItemEffects {
     });
   }
 
-  // ---- Bottle: drunken sway 3s, view follows a wandering point near mouse ----
+  // ---- Bottle: drunken sway 5s, view follows a wandering point near mouse ----
   _activateBottle(item, ctx) {
     const { game } = ctx;
     game._visionDrift = {
-      timer: 3.0,
+      timer: 5.0,
       wanderX: game.rawMouseX,
       wanderY: game.rawMouseY,
-      _vx: 0,
-      _vy: 0,
+      _targetX: game.rawMouseX,
+      _targetY: game.rawMouseY,
+      _changeTimer: 0, // triggers immediately on first update
     };
   }
 
@@ -189,41 +190,25 @@ export class ItemEffects {
     if (game._visionDrift) {
       const d = game._visionDrift;
       d.timer -= dt;
+      d._changeTimer -= dt;
 
-      // Random acceleration: the wandering point stumbles like a drunk person
-      const accel = 100;
-      d._vx += (Math.random() - 0.5) * accel * 2 * dt;
-      d._vy += (Math.random() - 0.5) * accel * 2 * dt;
-
-      // Damping so velocity doesn't explode
-      d._vx *= Math.exp(-4.5 * dt);
-      d._vy *= Math.exp(-4.5 * dt);
-
-      // Pull toward raw mouse so the wandering point stays near it
-      const pull = 6;
-      d._vx += (game.rawMouseX - d.wanderX) * pull * dt;
-      d._vy += (game.rawMouseY - d.wanderY) * pull * dt;
-
-      // Move
-      d.wanderX += d._vx * dt;
-      d.wanderY += d._vy * dt;
-
-      // Hard clamp: never exceed 55px from raw mouse
-      const dx = d.wanderX - game.rawMouseX;
-      const dy = d.wanderY - game.rawMouseY;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      const maxDist = 55;
-      if (dist > maxDist) {
-        d.wanderX = game.rawMouseX + (dx / dist) * maxDist;
-        d.wanderY = game.rawMouseY + (dy / dist) * maxDist;
+      // Every 0.4s, pick a new random target near the raw mouse
+      if (d._changeTimer <= 0) {
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 20 + Math.random() * 35; // 20–55px from mouse
+        d._targetX = game.rawMouseX + Math.cos(angle) * dist;
+        d._targetY = game.rawMouseY + Math.sin(angle) * dist;
+        d._targetX = Math.max(0, Math.min(game.app.screen.width, d._targetX));
+        d._targetY = Math.max(0, Math.min(game.app.screen.height, d._targetY));
+        d._changeTimer = 0.4;
       }
 
-      // Clamp to screen
-      d.wanderX = Math.max(0, Math.min(game.app.screen.width, d.wanderX));
-      d.wanderY = Math.max(0, Math.min(game.app.screen.height, d.wanderY));
+      // Smooth lerp wander point toward current target
+      const wanderLerp = Math.min(1, 3 * dt);
+      d.wanderX += (d._targetX - d.wanderX) * wanderLerp;
+      d.wanderY += (d._targetY - d.wanderY) * wanderLerp;
 
       if (d.timer <= 0) {
-        // Reset smoothed mouse to raw position so there's no residual offset
         game.mouseX = game.rawMouseX;
         game.mouseY = game.rawMouseY;
         game._visionDrift = null;
