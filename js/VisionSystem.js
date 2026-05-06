@@ -11,23 +11,17 @@ void main(void) {
 `;
 
 function buildFragmentSrc(candles) {
-  // Embed candle data directly in shader source — bypass uniform system entirely
-  let decl = '';
-  let logic = '';
-  if (candles && candles.length > 0) {
-    for (let i = 0; i < candles.length; i++) {
-      const c = candles[i];
-      decl += `uniform vec2 uC${i}Pos;\n`;
-      decl += `uniform float uC${i}Radius;\n`;
-      logic += `  { vec2 d = vScreenPos - uC${i}Pos; float r = max(uC${i}Radius, 0.001); alpha = min(alpha, smoothstep(r * 0.2, r, length(d))); }\n`;
-    }
+  let candleLogic = '';
+  for (let i = 0; i < candles.length; i++) {
+    const c = candles[i];
+    const r = Math.max(c.currentRadius, 1);
+    candleLogic += `  alpha = min(alpha, smoothstep(${(r * 0.2).toFixed(1)}, ${r.toFixed(1)}, length(vScreenPos - vec2(${c.x.toFixed(1)}, ${c.y.toFixed(1)}))));\n`;
   }
-  return `
-precision mediump float;
+  return `precision mediump float;
 varying vec2 vScreenPos;
 uniform vec2 uLightPos;
 uniform float uLightRadius;
-${decl}
+
 void main() {
     vec2 delta = vScreenPos - uLightPos;
     float dist = length(delta);
@@ -35,28 +29,9 @@ void main() {
     float cutoff = smoothstep(uLightRadius * 0.2, uLightRadius, dist);
     float glow = smoothstep(uLightRadius * 0.88, uLightRadius * 1.05, dist) * 0.06;
     float alpha = max(max(hotspot, cutoff), glow);
-${logic}
+${candleLogic}
     gl_FragColor = vec4(0.0, 0.0, 0.0, alpha);
-}
-`;
-}
-
-function buildProgram(candles) {
-  return PIXI.Program.from(VERTEX_SRC, buildFragmentSrc(candles));
-}
-
-function buildUniforms(x, y, radius, candles) {
-  const u = {
-    uLightPos:  new Float32Array([x, y]),
-    uLightRadius: radius,
-  };
-  if (candles) {
-    for (let i = 0; i < candles.length; i++) {
-      u[`uC${i}Pos`] = new Float32Array([candles[i].x, candles[i].y]);
-      u[`uC${i}Radius`] = Math.max(candles[i].currentRadius, 0.001);
-    }
-  }
-  return u;
+}`;
 }
 
 export class VisionSystem {
@@ -72,49 +47,48 @@ export class VisionSystem {
     this._glowColor = 0x333333;
     this._glowAlpha = 0.25;
 
-    this._candleCount = 0;
-    this._rebuild(x, y, radius, []);
+    this._lastCandleHash = '';
+
+    const w = app.screen.width;
+    const h = app.screen.height;
+
+    this._build(x, y, radius, []);
 
     this.glowRing = new PIXI.Graphics();
     this.container.addChild(this.glowRing);
   }
 
-  _rebuild(x, y, radius, candles) {
+  _build(x, y, radius, candles) {
     const w = this.app.screen.width;
     const h = this.app.screen.height;
 
-    const program = buildProgram(candles);
-    const uniforms = buildUniforms(x, y, radius, candles);
-    this._shader = new PIXI.Shader(program, uniforms);
-    this._candleCount = candles.length;
+    const program = PIXI.Program.from(VERTEX_SRC, buildFragmentSrc(candles));
+    this._shader = new PIXI.Shader(program, {
+      uLightPos:    new Float32Array([x, y]),
+      uLightRadius: radius,
+    });
 
     if (this.darkness) {
       this.container.removeChild(this.darkness);
-      this.darkness.destroy();
+      this.darkness.destroy({ children: true });
     }
-    this.darkness = this._createMesh(w, h);
-    this.container.addChildAt(this.darkness, 0);
-  }
-
-  _createMesh(w, h) {
     const geometry = new PIXI.Geometry()
       .addAttribute('aVertexPosition', [0, 0, w, 0, w, h, 0, h], 2)
       .addIndex([0, 1, 2, 0, 2, 3]);
-    return new PIXI.Mesh(geometry, this._shader);
+    this.darkness = new PIXI.Mesh(geometry, this._shader);
+    this.container.addChildAt(this.darkness, 0);
   }
 
   setCandles(candleList) {
-    if (candleList.length !== this._candleCount) {
-      // Rebuild shader with matching uniform count
-      this._rebuild(this.x, this.y, this.currentRadius, candleList);
-      return;
+    // Hash check: only rebuild if candle state changed
+    let hash = '';
+    for (const c of candleList) {
+      hash += `${c.x.toFixed(0)},${c.y.toFixed(0)},${c.currentRadius.toFixed(0)};`;
     }
-    // Same count: update existing uniforms
-    for (let i = 0; i < candleList.length; i++) {
-      const c = candleList[i];
-      this._shader.uniforms[`uC${i}Pos`] = new Float32Array([c.x, c.y]);
-      this._shader.uniforms[`uC${i}Radius`] = Math.max(c.currentRadius, 0.001);
-    }
+    if (hash === this._lastCandleHash) return;
+    this._lastCandleHash = hash;
+
+    this._build(this.x, this.y, this.currentRadius, candleList);
   }
 
   update(x, y) {
@@ -142,15 +116,8 @@ export class VisionSystem {
     this.radius = radius;
     this.targetRadius = radius;
     this.currentRadius = radius;
-
-    this.container.removeChild(this.darkness);
-    this.darkness.destroy();
-    this.darkness = this._createMesh(w, h);
-    this.container.addChildAt(this.darkness, 0);
-
-    this._shader.uniforms.uLightPos[0] = this.x;
-    this._shader.uniforms.uLightPos[1] = this.y;
-    this._shader.uniforms.uLightRadius = radius;
+    this._build(this.x, this.y, radius, []);
+    this._lastCandleHash = '';
   }
 
   reset() {
