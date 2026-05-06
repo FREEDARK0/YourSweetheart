@@ -63,33 +63,31 @@ export class VisionSystem {
     const h = this.app.screen.height;
 
     const fragSrc = buildFragmentSrc(candles);
-    console.log('[Vision] _build called, candles:', candles.length,
-      'fragSrc has candle logic:', fragSrc.includes('smoothstep'));
-    console.log('[Vision] rebuilding shader, fragSrc length:', fragSrc.length);
     this._shader = PIXI.Shader.from(VERTEX_SRC, fragSrc, {
       uLightPos:    new Float32Array([x, y]),
       uLightRadius: radius,
     });
 
-    if (this.darkness) {
-      this.container.removeChild(this.darkness);
-      this.darkness.destroy({ children: true });
+    if (!this.darkness) {
+      const geometry = new PIXI.Geometry()
+        .addAttribute('aVertexPosition', [0, 0, w, 0, w, h, 0, h], 2)
+        .addIndex([0, 1, 2, 0, 2, 3]);
+      this.darkness = new PIXI.Mesh(geometry, this._shader);
+      this.container.addChildAt(this.darkness, 0);
+    } else {
+      // Hot-swap shader on existing mesh
+      this.darkness.material = this._shader;
+      this.darkness.shader = this._shader;
     }
-    const geometry = new PIXI.Geometry()
-      .addAttribute('aVertexPosition', [0, 0, w, 0, w, h, 0, h], 2)
-      .addIndex([0, 1, 2, 0, 2, 3]);
-    this.darkness = new PIXI.Mesh(geometry, this._shader);
-    this.container.addChildAt(this.darkness, 0);
   }
 
   setCandles(candleList) {
-    // Hash check: only rebuild if candle state changed
-    let hash = '';
+    // Only rebuild when candle count or positions change (not radius which animates)
+    let hash = candleList.length;
     for (const c of candleList) {
-      hash += `${c.x.toFixed(0)},${c.y.toFixed(0)},${c.currentRadius.toFixed(0)};`;
+      hash += `|${c.x.toFixed(0)},${c.y.toFixed(0)}`;
     }
     if (hash === this._lastCandleHash) return;
-    console.log('[Vision] setCandles: hash changed, rebuilding. candles:', candleList.length);
     this._lastCandleHash = hash;
 
     this._build(this.x, this.y, this.currentRadius, candleList);
