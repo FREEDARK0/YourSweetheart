@@ -62,7 +62,11 @@ export class VisionSystem {
     const w = this.app.screen.width;
     const h = this.app.screen.height;
 
-    const program = PIXI.Program.from(VERTEX_SRC, buildFragmentSrc(candles));
+    const fragSrc = buildFragmentSrc(candles);
+    console.log('[Vision] _build called, candles:', candles.length,
+      'fragSrc has candle logic:', fragSrc.includes('smoothstep'));
+    const program = PIXI.Program.from(VERTEX_SRC, fragSrc);
+    console.log('[Vision] program created, fragSrc length:', fragSrc.length);
     this._shader = new PIXI.Shader(program, {
       uLightPos:    new Float32Array([x, y]),
       uLightRadius: radius,
@@ -86,6 +90,7 @@ export class VisionSystem {
       hash += `${c.x.toFixed(0)},${c.y.toFixed(0)},${c.currentRadius.toFixed(0)};`;
     }
     if (hash === this._lastCandleHash) return;
+    console.log('[Vision] setCandles: hash changed, rebuilding. candles:', candleList.length);
     this._lastCandleHash = hash;
 
     this._build(this.x, this.y, this.currentRadius, candleList);
