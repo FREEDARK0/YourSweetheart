@@ -12,23 +12,11 @@ float random(vec2 uv) {
 
 void main() {
   vec2 uv = vTextureCoord;
-
-  // Subtle chromatic aberration (RGB lateral shift)
-  float shift = 0.0008;
-  float r = texture2D(uSampler, uv + vec2(shift, 0.0)).r;
-  float g = texture2D(uSampler, uv).g;
-  float b = texture2D(uSampler, uv - vec2(shift, 0.0)).b;
-  vec4 color = vec4(r, g, b, 1.0);
+  vec4 color = texture2D(uSampler, uv);
 
   // Moving noise grain
   float noise = (random(uv * uResolution + uTime * 90.0) - 0.5) * 0.04;
-
-  // Occasional horizontal glitch band
-  float bandRng = random(vec2(floor(uv.y * 55.0), floor(uTime * 3.3)));
-  float band = step(0.997, bandRng) * 0.03;
-
   color.rgb += noise;
-  color.rgb += band;
 
   // Vignette (darker corners)
   vec2 vig = uv - 0.5;
@@ -39,8 +27,8 @@ void main() {
   color.r *= 0.97;
   color.b *= 0.90;
 
-  // Subtle brightness wobble
-  color.rgb *= 1.0 + sin(uTime * 12.0 + uv.y * 10.0) * 0.01;
+  // Subtle global brightness wobble
+  color.rgb *= 1.0 + sin(uTime * 8.0) * 0.008;
 
   gl_FragColor = color;
 }

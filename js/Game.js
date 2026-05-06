@@ -54,6 +54,7 @@ export class Game {
     this._initialTextSpawned = false;
     this._initialTextTimer = 1.2;
     this._startDelay = 1.0; // NPC frozen for 1s at game start
+    this._introLerpTimer = 0; // smooth view transition after start delay
 
     // Effects state
     this._mouseModifiers = [];
@@ -158,7 +159,6 @@ export class Game {
 
   _setupInput() {
     const setRaw = (cx, cy) => {
-      if (this._startDelay > 0) return; // locked during intro freeze
       const rect = this.app.view.getBoundingClientRect();
       this.rawMouseX = (cx - rect.left) * (this.app.screen.width / rect.width);
       this.rawMouseY = (cy - rect.top) * (this.app.screen.height / rect.height);
@@ -270,6 +270,9 @@ export class Game {
     const prevNpcY = this.npc.y;
     if (this._startDelay > 0) {
       this._startDelay -= dt;
+      if (this._startDelay <= 0) {
+        this._introLerpTimer = 0.5; // smooth catch-up from center to mouse
+      }
     } else {
       const context = {
         worldState: {
@@ -338,13 +341,12 @@ export class Game {
   // ---- Mouse position with modifiers / drift ----
 
   _updateMousePosition(dt) {
-    // Compute raw delta
     let dX = this.rawMouseX - this._prevRawX;
     let dY = this.rawMouseY - this._prevRawY;
     this._prevRawX = this.rawMouseX;
     this._prevRawY = this.rawMouseY;
 
-    // Apply portrait modifiers (axis swap / invert)
+    // Portrait modifiers
     for (const mod of this._mouseModifiers) {
       if (mod.type === 'portrait') {
         let ndX = dX, ndY = dY;
@@ -354,6 +356,20 @@ export class Game {
         dX = ndX;
         dY = ndY;
       }
+    }
+
+    // Frozen during start delay — rawMouse tracks normally but view stays at center
+    if (this._startDelay > 0) return;
+
+    // Intro lerp: smooth transition from frozen center to actual mouse position
+    if (this._introLerpTimer > 0) {
+      this._introLerpTimer -= dt;
+      const speed = Math.min(1, 4.0 * dt);
+      this.mouseX += (this.rawMouseX - this.mouseX) * speed;
+      this.mouseY += (this.rawMouseY - this.mouseY) * speed;
+      this.mouseX = Math.max(0, Math.min(this.app.screen.width, this.mouseX));
+      this.mouseY = Math.max(0, Math.min(this.app.screen.height, this.mouseY));
+      return;
     }
 
     // Target = current + modified delta
@@ -605,6 +621,7 @@ export class Game {
     this._initialTextSpawned = false;
     this._initialTextTimer = 1.2;
     this._startDelay = 1.0;
+    this._introLerpTimer = 0;
 
     // Reset mouse state
     this.rawMouseX = this.app.screen.width / 2;
