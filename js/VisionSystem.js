@@ -37,6 +37,10 @@ void main() {
 
     float alpha = max(max(hotspot, cutoff), glow);
 ${logic}
+    // HARDCODED TEST: aperture at (100,100) radius 80px
+    float tD = length(vScreenPos - vec2(100.0, 100.0));
+    alpha = min(alpha, smoothstep(50.0, 80.0, tD));
+
     gl_FragColor = vec4(0.0, 0.0, 0.0, alpha);
 }
 `;
