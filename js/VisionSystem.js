@@ -14,8 +14,8 @@ function buildFragmentSrc(candles) {
   let candleLogic = '';
   for (let i = 0; i < candles.length; i++) {
     const c = candles[i];
-    const r = Math.max(c.currentRadius, 1);
-    candleLogic += `  alpha = min(alpha, smoothstep(${(r * 0.2).toFixed(1)}, ${r.toFixed(1)}, length(vScreenPos - vec2(${c.x.toFixed(1)}, ${c.y.toFixed(1)}))));\n`;
+    // Use if-statement (proven working in v0.7) instead of smoothstep
+    candleLogic += `  if (length(vScreenPos - vec2(${c.x.toFixed(1)}, ${c.y.toFixed(1)})) < ${c.currentRadius.toFixed(1)}) { alpha = 0.0; }\n`;
   }
   return `precision mediump float;
 varying vec2 vScreenPos;
