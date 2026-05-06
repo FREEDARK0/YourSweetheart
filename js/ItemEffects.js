@@ -192,17 +192,17 @@ export class ItemEffects {
       const d = game._visionDrift;
       d.timer -= dt;
 
-      // Random acceleration: the wandering point moves like a drunk person
-      const accel = 180;
+      // Random acceleration: the wandering point stumbles like a drunk person
+      const accel = 100;
       d._vx += (Math.random() - 0.5) * accel * 2 * dt;
       d._vy += (Math.random() - 0.5) * accel * 2 * dt;
 
       // Damping so velocity doesn't explode
-      d._vx *= Math.exp(-3 * dt);
-      d._vy *= Math.exp(-3 * dt);
+      d._vx *= Math.exp(-4.5 * dt);
+      d._vy *= Math.exp(-4.5 * dt);
 
       // Pull toward raw mouse so the wandering point stays near it
-      const pull = 3.5;
+      const pull = 6;
       d._vx += (game.rawMouseX - d.wanderX) * pull * dt;
       d._vy += (game.rawMouseY - d.wanderY) * pull * dt;
 
@@ -210,11 +210,24 @@ export class ItemEffects {
       d.wanderX += d._vx * dt;
       d.wanderY += d._vy * dt;
 
+      // Hard clamp: never exceed 55px from raw mouse
+      const dx = d.wanderX - game.rawMouseX;
+      const dy = d.wanderY - game.rawMouseY;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      const maxDist = 55;
+      if (dist > maxDist) {
+        d.wanderX = game.rawMouseX + (dx / dist) * maxDist;
+        d.wanderY = game.rawMouseY + (dy / dist) * maxDist;
+      }
+
       // Clamp to screen
       d.wanderX = Math.max(0, Math.min(game.app.screen.width, d.wanderX));
       d.wanderY = Math.max(0, Math.min(game.app.screen.height, d.wanderY));
 
       if (d.timer <= 0) {
+        // Reset smoothed mouse to raw position so there's no residual offset
+        game.mouseX = game.rawMouseX;
+        game.mouseY = game.rawMouseY;
         game._visionDrift = null;
       }
     }

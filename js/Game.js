@@ -357,7 +357,7 @@ export class Game {
     // Bottle: follow a wandering point near the mouse instead of the mouse itself
     let lerpSpeed = 1.0;
     if (this._visionDrift) {
-      lerpSpeed = 0.1;
+      lerpSpeed = 0.18;
       targetX = this._visionDrift.wanderX;
       targetY = this._visionDrift.wanderY;
     }
