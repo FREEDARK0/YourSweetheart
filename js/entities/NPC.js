@@ -80,13 +80,22 @@ export class NPC {
       return;
     }
 
-    // 影子投射方向：远离光源
-    const shadowLen = Math.min(50, dist * 0.30);
-    this._shadow.x = (dx / dist) * shadowLen;
-    this._shadow.y = (dy / dist) * shadowLen + this._bobOffset + 6;
+    // 影子投射方向：远离光源，距离越近影子越长
+    const shadowLen = Math.min(90, dist * 0.65);
+    const sx = (dx / dist) * shadowLen;
+    const sy = (dy / dist) * shadowLen;
 
-    // 影子朝向与主体一致
-    this._shadow.scale.x = Math.abs(this.sprite.scale.x);
+    this._shadow.x = sx;
+    this._shadow.y = sy + this._bobOffset + 8;
+    this._shadow.alpha = 0.50;
+
+    // 沿光源投射方向拉伸影子（不旋转，只拉伸）
+    const stretch = 1.0 + shadowLen / 50;
+    const castAngle = Math.atan2(dy, dx);
+    this._shadow.scale.x = Math.abs(this.sprite.scale.x) * (1.0 + Math.abs(Math.cos(castAngle)) * (stretch - 1.0));
+    // Y 方向：垂直压扁 + 顺投射方向的拉伸
+    const baseScaleY = Math.abs(this.sprite.scale.y) * 0.45;
+    this._shadow.scale.y = baseScaleY * (1.0 + Math.abs(Math.sin(castAngle)) * (stretch - 1.0) * 0.5);
   }
 
   isInVision(vision) {

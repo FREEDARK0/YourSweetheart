@@ -2,23 +2,37 @@ const fragSrc = `
   precision mediump float;
   varying vec2 vTextureCoord;
   uniform sampler2D uSampler;
-  uniform vec2 uNpcWorldPos;     // NPC 世界坐标（屏幕像素）
-  uniform vec2 uSpriteWorldSize; // 精灵在世界空间的宽高（像素）
-  uniform vec2 uAnchor;          // 精灵锚点 (0.5, 0.85)
-  uniform vec2 uLightPos;        // 光源世界坐标（屏幕像素）
-  uniform float uLightRadius;    // 光源有效照明半径
+  uniform vec2 uNpcWorldPos;
+  uniform vec2 uSpriteWorldSize;
+  uniform vec2 uAnchor;
+  uniform vec2 uLightPos;
+  uniform float uLightRadius;
 
   void main() {
     vec4 texColor = texture2D(uSampler, vTextureCoord);
 
-    // 将纹理 UV 转换为世界像素坐标
+    // 当前像素相对于 NPC 中心的世界坐标偏移
     vec2 localPx = (vTextureCoord - uAnchor) * uSpriteWorldSize;
     vec2 worldPx = uNpcWorldPos + localPx;
 
-    float dist = length(worldPx - uLightPos);
-    float t = smoothstep(0.0, uLightRadius, dist);
-    float light = 1.0 - t * 0.65;
+    // 光源到 NPC 中心的方向（决定哪一侧亮）
+    vec2 toLight = uLightPos - uNpcWorldPos;
+    float distToNpc = length(toLight);
+    vec2 lightDir = distToNpc > 0.5 ? toLight / distToNpc : vec2(1.0, 0.0);
 
+    // 当前像素的局部方向（归一化到精灵宽度）
+    vec2 pixDir = localPx / (uSpriteWorldSize * 0.5);
+
+    // 面向光源的程度：1.0=正对光源，-1.0=背对光源
+    float facing = dot(normalize(pixDir), lightDir);
+
+    // 方向光：迎光面亮，背光面暗
+    float dirLight = 0.08 + (facing * 0.5 + 0.5) * 0.92;
+
+    // 距离衰减：离光源越远整体越暗
+    float distAtten = 1.0 - smoothstep(uLightRadius * 0.3, uLightRadius, distToNpc) * 0.75;
+
+    float light = dirLight * distAtten;
     gl_FragColor = texColor * vec4(light, light, light, 1.0);
   }
 `;
