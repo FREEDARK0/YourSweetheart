@@ -118,8 +118,15 @@ export class VisionSystem {
     this.radius = radius;
     this.targetRadius = radius;
     this.currentRadius = radius;
-    this._build(this.x, this.y, radius, []);
+
+    // Force mesh recreation for new screen size
+    if (this.darkness) {
+      this.container.removeChild(this.darkness);
+      this.darkness.destroy({ children: true });
+      this.darkness = null;
+    }
     this._lastCandleHash = '';
+    this._build(this.x, this.y, radius, []);
   }
 
   reset() {
