@@ -114,6 +114,15 @@ export class Game {
     this._setupInventoryUI();
     this._setupVersionLabel();
 
+    // DIAGNOSTIC: start with 1 candle at (200,200)
+    this.inventory.candle.count = 1;
+    this.placedCandles.push({
+      x: 200, y: 200,
+      baseRadius: this.visionRadius * 0.85,
+      currentRadius: this.visionRadius * 0.85,
+      elapsed: 0, state: 'stable',
+    });
+
     this.app.ticker.add((delta) => this._update(delta));
   }
 
@@ -709,7 +718,7 @@ export class Game {
   }
 
   _setupVersionLabel() {
-    this.versionLabel = new PIXI.Text('v0.22', {
+    this.versionLabel = new PIXI.Text('v0.23', {
       fontFamily: 'Kurobara',
       fontSize: 14,
       fill: '#333333',
