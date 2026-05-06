@@ -48,6 +48,7 @@ export class VisionSystem {
     this._glowAlpha = 0.25;
 
     this._lastCandleHash = '';
+    this._candleRings = [];
 
     const w = app.screen.width;
     const h = app.screen.height;
