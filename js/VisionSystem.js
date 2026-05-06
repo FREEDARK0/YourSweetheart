@@ -85,10 +85,14 @@ export class VisionSystem {
     this.darkness = this._createMesh(w, h);
     this.container.addChild(this.darkness);
 
-    // TEST: candle at screen center with large radius — verifies uniform upload
+    // TEST: candle at screen center — verify uniform upload
     this._testCandle = true;
+    console.log('[Vision] Uniform keys:', Object.keys(this._shader.uniforms));
+    console.log('[Vision] uC0Radius before set:', this._shader.uniforms.uC0Radius);
     this._shader.uniforms.uC0Pos = new Float32Array([w / 2, h / 2]);
     this._shader.uniforms.uC0Radius = 180;
+    console.log('[Vision] uC0Radius after set:', this._shader.uniforms.uC0Radius);
+    console.log('[Vision] uC0Pos after set:', this._shader.uniforms.uC0Pos);
 
     this.glowRing = new PIXI.Graphics();
     this.container.addChild(this.glowRing);
