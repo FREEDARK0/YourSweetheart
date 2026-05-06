@@ -21,7 +21,7 @@ const fragSrc = `
     float NdotL = max(0.0, dot(normal, vec3(lightDir2D, 0.2)));
     float wrap = NdotL * 0.55 + 0.45;
 
-    float t = smoothstep(uLightRadiusNorm, uLightRadiusNorm * 0.3, dist);
+    float t = smoothstep(uLightRadiusNorm * 0.3, uLightRadiusNorm, dist);
     float attenuation = 1.0 - t;
 
     float light = uAmbient + (1.0 - uAmbient) * wrap * attenuation;

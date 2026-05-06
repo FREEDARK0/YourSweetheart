@@ -67,6 +67,7 @@ export class GroundRenderer {
     // --- PixiJS 纹理 ---
     const colorTex = PIXI.Texture.from(colorCanvas);
     const normalTex = PIXI.Texture.from(normalCanvas);
+    normalTex.baseTexture.wrapMode = PIXI.WRAP_MODES.REPEAT;
 
     const ground = new PIXI.TilingSprite(colorTex, screenW, screenH);
     ground.tileScale.set(1.5);
