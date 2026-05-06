@@ -65,40 +65,48 @@ export class NPC {
   }
 
   updateShadow(lightX, lightY) {
-    const dx = this.x - lightX;
-    const dy = this.y - lightY;
+    const dx = lightX - this.x;
+    const dy = lightY - this.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
 
     this._shadowGfx.clear();
 
     if (dist < 1) return;
 
-    // 投射方向：远离光源
-    const castAngle = Math.atan2(dy, dx);
+    // 梯形延伸方向：始终沿鼠标↔NPC 连线方向
+    const toLightAngle = Math.atan2(dy, dx);
 
-    // 影子长度：光源越近影子越短
-    const shadowLen = Math.min(140, 25 + dist * 0.35);
+    // 梯形长度：光源越近影子越长
+    const shadowLen = Math.min(260, 60 + dist * 0.70);
 
-    // 梯形尺寸：底部（靠近 NPC）宽，远端窄
-    const baseHalfW = 24;
-    const tipHalfW  = 8;
+    // 梯形：底部宽（靠 NPC），远端略窄
+    const baseHalfW = 36;
+    const tipHalfW  = 16;
 
-    // 多层绘制（从外到内，深色叠在浅色上）
+    // ── 圆形脚底阴影 ──
+    this._shadowGfx.beginFill(0x000000, 0.55);
+    this._shadowGfx.drawEllipse(0, this._bobOffset + 8, 26, 10);
+    this._shadowGfx.endFill();
+    this._shadowGfx.beginFill(0x000000, 0.30);
+    this._shadowGfx.drawEllipse(0, this._bobOffset + 8, 32, 13);
+    this._shadowGfx.endFill();
+
+    // ── 梯形投影（三层渐变） ──
     // 外层柔化
     this._shadowGfx.beginFill(0x000000, 0.18);
-    this._shadowGfx.moveTo(-baseHalfW * 1.25, 2);
-    this._shadowGfx.lineTo( baseHalfW * 1.25, 2);
-    this._shadowGfx.lineTo( tipHalfW * 1.5, -shadowLen);
-    this._shadowGfx.lineTo(-tipHalfW * 1.5, -shadowLen);
+    this._shadowGfx.moveTo(-baseHalfW * 1.3, 4);
+    this._shadowGfx.lineTo( baseHalfW * 1.3, 4);
+    this._shadowGfx.lineTo( tipHalfW * 1.6, -shadowLen);
+    this._shadowGfx.lineTo(-tipHalfW * 1.6, -shadowLen);
     this._shadowGfx.closePath();
     this._shadowGfx.endFill();
 
     // 中层过渡
     this._shadowGfx.beginFill(0x000000, 0.50);
-    this._shadowGfx.moveTo(-baseHalfW * 1.05, 1);
-    this._shadowGfx.lineTo( baseHalfW * 1.05, 1);
-    this._shadowGfx.lineTo( tipHalfW * 1.15, -shadowLen);
-    this._shadowGfx.lineTo(-tipHalfW * 1.15, -shadowLen);
+    this._shadowGfx.moveTo(-baseHalfW * 1.08, 2);
+    this._shadowGfx.lineTo( baseHalfW * 1.08, 2);
+    this._shadowGfx.lineTo( tipHalfW * 1.2, -shadowLen);
+    this._shadowGfx.lineTo(-tipHalfW * 1.2, -shadowLen);
     this._shadowGfx.closePath();
     this._shadowGfx.endFill();
 
@@ -111,8 +119,8 @@ export class NPC {
     this._shadowGfx.closePath();
     this._shadowGfx.endFill();
 
-    // 旋转使阴影指向远离光源的方向
-    this._shadowGfx.rotation = castAngle + Math.PI / 2;
+    // 旋转使梯形指向鼠标方向
+    this._shadowGfx.rotation = toLightAngle - Math.PI / 2;
     this._shadowGfx.x = 0;
     this._shadowGfx.y = this._bobOffset + 6;
   }
