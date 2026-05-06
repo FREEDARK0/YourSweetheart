@@ -1,67 +1,32 @@
-const MAX_CANDLES = 8;
+/**
+ * 手电筒视野系统 — 使用 Sprite Mask 方案。
+ * 黑暗遮罩被一个 Mask 容器控制：白底 + 黑色渐变圆 = 在光圈处透明。
+ * 主视野和蜡烛光圈都是 Mask 容器内的渐变 Sprite。
+ */
 
-const VERTEX_SRC = `
-attribute vec2 aVertexPosition;
-uniform mat3 projectionMatrix;
-uniform mat3 translationMatrix;
-varying vec2 vScreenPos;
+const GRADIENT_SIZE = 512; // radial gradient texture resolution
 
-void main(void) {
-    gl_Position = vec4((projectionMatrix * translationMatrix * vec3(aVertexPosition, 1.0)).xy, 0.0, 1.0);
-    vScreenPos = aVertexPosition;
-}
-`;
-
-// Generate per-slot uniform declarations and shader logic
-function buildFragmentSrc() {
-  let uniforms = '';
-  let logic = '';
-  for (let i = 0; i < MAX_CANDLES; i++) {
-    uniforms += `uniform vec2 uC${i}Pos;\n`;
-    uniforms += `uniform float uC${i}Radius;\n`;
-    logic += `  { vec2 d = vScreenPos - uC${i}Pos; float r = max(uC${i}Radius, 0.001); alpha = min(alpha, smoothstep(r * 0.2, r, length(d))); }\n`;
-  }
-  return `
-precision mediump float;
-varying vec2 vScreenPos;
-uniform vec2 uLightPos;
-uniform float uLightRadius;
-${uniforms}
-void main() {
-    vec2 delta = vScreenPos - uLightPos;
-    float dist = length(delta);
-
-    float hotspot = smoothstep(0.0, uLightRadius * 0.7, dist) * 0.10;
-    float cutoff = smoothstep(uLightRadius * 0.2, uLightRadius, dist);
-    float glow = smoothstep(uLightRadius * 0.88, uLightRadius * 1.05, dist) * 0.06;
-
-    float alpha = max(max(hotspot, cutoff), glow);
-${logic}
-    gl_FragColor = vec4(0.0, 0.0, 0.0, alpha);
-}
-`;
+function createGradientTex() {
+  const size = GRADIENT_SIZE;
+  const half = size / 2;
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  // Gradient: center opaque black (mask hides darkness), edge transparent (mask shows darkness)
+  const g = ctx.createRadialGradient(half, half, 0, half, half, half);
+  g.addColorStop(0,   'rgba(0,0,0,1)');
+  g.addColorStop(0.7, 'rgba(0,0,0,0.8)');
+  g.addColorStop(1,   'rgba(0,0,0,0)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, size, size);
+  return PIXI.Texture.from(canvas);
 }
 
-const FRAGMENT_SRC = buildFragmentSrc();
-
-let _sharedProgram = null;
-function getProgram() {
-  if (!_sharedProgram) {
-    _sharedProgram = PIXI.Program.from(VERTEX_SRC, FRAGMENT_SRC);
-  }
-  return _sharedProgram;
-}
-
-function buildUniforms(x, y, radius) {
-  const u = {
-    uLightPos:    new Float32Array([x, y]),
-    uLightRadius: radius,
-  };
-  for (let i = 0; i < MAX_CANDLES; i++) {
-    u[`uC${i}Pos`] = new Float32Array([0, 0]);
-    u[`uC${i}Radius`] = 0.001;
-  }
-  return u;
+let _sharedGradientTex = null;
+function sharedGradientTex() {
+  if (!_sharedGradientTex) _sharedGradientTex = createGradientTex();
+  return _sharedGradientTex;
 }
 
 export class VisionSystem {
@@ -80,68 +45,72 @@ export class VisionSystem {
     const w = app.screen.width;
     const h = app.screen.height;
 
-    this._shader = new PIXI.Shader(getProgram(), buildUniforms(x, y, radius));
-
-    this.darkness = this._createMesh(w, h);
+    // Full-screen black overlay (the thing being masked)
+    this.darkness = new PIXI.Sprite(PIXI.Texture.WHITE);
+    this.darkness.width = w;
+    this.darkness.height = h;
+    this.darkness.tint = 0x000000;
     this.container.addChild(this.darkness);
 
-    // TEST: candle at screen center — verify uniform upload
-    this._testCandle = true;
-    console.log('[Vision] Uniform keys:', Object.keys(this._shader.uniforms));
-    console.log('[Vision] uC0Radius before set:', this._shader.uniforms.uC0Radius);
-    this._shader.uniforms.uC0Pos = new Float32Array([w / 2, h / 2]);
-    this._shader.uniforms.uC0Radius = 180;
-    console.log('[Vision] uC0Radius after set:', this._shader.uniforms.uC0Radius);
-    console.log('[Vision] uC0Pos after set:', this._shader.uniforms.uC0Pos);
+    // Mask container: white background with black gradient "holes"
+    this._maskContainer = new PIXI.Container();
+    this.container.addChild(this._maskContainer);
 
+    // White full-screen background in mask (darkness visible by default everywhere)
+    const whiteBg = new PIXI.Sprite(PIXI.Texture.WHITE);
+    whiteBg.width = w;
+    whiteBg.height = h;
+    this._maskContainer.addChild(whiteBg);
+
+    // Main vision gradient sprite (black center = mask hides darkness = game visible)
+    this._mainGradient = new PIXI.Sprite(sharedGradientTex());
+    this._mainGradient.anchor.set(0.5);
+    this._mainGradient.x = x;
+    this._mainGradient.y = y;
+    this._updateMainScale();
+    this._maskContainer.addChild(this._mainGradient);
+
+    // Candle gradient sprites (reused pool)
+    this._candleSprites = [];
+    this._maxCandles = 8;
+    for (let i = 0; i < this._maxCandles; i++) {
+      const s = new PIXI.Sprite(sharedGradientTex());
+      s.anchor.set(0.5);
+      s.visible = false;
+      this._maskContainer.addChild(s);
+      this._candleSprites.push(s);
+    }
+
+    // Apply mask
+    this.darkness.mask = this._maskContainer;
+
+    // Gray glow ring (decorative, outside mask system)
     this.glowRing = new PIXI.Graphics();
     this.container.addChild(this.glowRing);
   }
 
-  _createMesh(w, h) {
-    const geometry = new PIXI.Geometry()
-      .addAttribute('aVertexPosition', [0, 0, w, 0, w, h, 0, h], 2)
-      .addIndex([0, 1, 2, 0, 2, 3]);
-    return new PIXI.Mesh(geometry, this._shader);
+  _updateMainScale() {
+    const s = this.currentRadius / (GRADIENT_SIZE / 2);
+    this._mainGradient.scale.set(s);
   }
 
   setCandles(candleList) {
-    if (this._testCandle) return; // preserve test candle
-    const count = Math.min(candleList.length, MAX_CANDLES);
-    for (let i = 0; i < MAX_CANDLES; i++) {
-      if (i < count) {
+    for (let i = 0; i < this._maxCandles; i++) {
+      const sprite = this._candleSprites[i];
+      if (i < candleList.length) {
         const c = candleList[i];
-        this._shader.uniforms[`uC${i}Pos`] = new Float32Array([c.x, c.y]);
-        this._shader.uniforms[`uC${i}Radius`] = Math.max(c.currentRadius, 0.001);
+        sprite.visible = true;
+        sprite.x = c.x;
+        sprite.y = c.y;
+        const s = Math.max(c.currentRadius, 1) / (GRADIENT_SIZE / 2);
+        sprite.scale.set(s);
       } else {
-        this._shader.uniforms[`uC${i}Radius`] = 0.001;
+        sprite.visible = false;
       }
     }
   }
 
   update(x, y) {
-    // One-time diagnostic: log WebGL active uniforms
-    if (!this._logged) {
-      this._logged = true;
-      try {
-        const gl = this.app.renderer.gl;
-        // Try multiple paths to get the compiled WebGL program
-        const shaderProg = this._shader.program;
-        const sharedProg = getProgram();
-        const wp = (shaderProg && shaderProg.program) || (shaderProg && shaderProg._program)
-                || (sharedProg && sharedProg.program) || (sharedProg && sharedProg._program);
-        console.log('[Vision] shaderProg:', !!shaderProg, 'wp:', !!wp);
-        if (gl && wp) {
-          const count = gl.getProgramParameter(wp, gl.ACTIVE_UNIFORMS);
-          console.log('[Vision] Active uniforms in program:', count);
-          for (let i = 0; i < count; i++) {
-            const info = gl.getActiveUniform(wp, i);
-            console.log(`[Vision]   ${i}: ${info.name} size=${info.size} type=${info.type}`);
-          }
-        }
-      } catch(e) { console.error('[Vision] error:', e); }
-    }
-
     this.x = x;
     this.y = y;
 
@@ -151,9 +120,9 @@ export class VisionSystem {
     }
     this.radius = this.currentRadius;
 
-    this._shader.uniforms.uLightPos[0] = x;
-    this._shader.uniforms.uLightPos[1] = y;
-    this._shader.uniforms.uLightRadius = this.currentRadius;
+    this._mainGradient.x = x;
+    this._mainGradient.y = y;
+    this._updateMainScale();
 
     this.glowRing.clear();
     this.glowRing.lineStyle(2, this._glowColor, this._glowAlpha);
@@ -167,14 +136,17 @@ export class VisionSystem {
     this.targetRadius = radius;
     this.currentRadius = radius;
 
-    this.container.removeChild(this.darkness);
-    this.darkness.destroy();
-    this.darkness = this._createMesh(w, h);
-    this.container.addChildAt(this.darkness, 0);
+    this.darkness.width = w;
+    this.darkness.height = h;
 
-    this._shader.uniforms.uLightPos[0] = this.x;
-    this._shader.uniforms.uLightPos[1] = this.y;
-    this._shader.uniforms.uLightRadius = radius;
+    // Update white background in mask
+    const bg = this._maskContainer.children[0];
+    bg.width = w;
+    bg.height = h;
+
+    this._mainGradient.x = this.x;
+    this._mainGradient.y = this.y;
+    this._updateMainScale();
   }
 
   reset() {
@@ -184,17 +156,13 @@ export class VisionSystem {
     this._glowAlpha = 0.25;
   }
 
-  setTargetRadius(r) {
-    this.targetRadius = r;
-  }
+  setTargetRadius(r) { this.targetRadius = r; }
 
   setRadius(r) {
     this.radius = r;
     this.currentRadius = r;
     this.targetRadius = r;
-    this._shader.uniforms.uLightPos[0] = this.x;
-    this._shader.uniforms.uLightPos[1] = this.y;
-    this._shader.uniforms.uLightRadius = r;
+    this._updateMainScale();
   }
 
   setGlowColor(color, alpha) {
