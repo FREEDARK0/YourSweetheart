@@ -12,16 +12,21 @@ void main(void) {
 }
 `;
 
-const FRAGMENT_SRC = `
-#define MAX_CANDLES ${MAX_CANDLES}
-
+// Generate per-slot uniform declarations and shader logic
+function buildFragmentSrc() {
+  let uniforms = '';
+  let logic = '';
+  for (let i = 0; i < MAX_CANDLES; i++) {
+    uniforms += `uniform vec2 uC${i}Pos;\n`;
+    uniforms += `uniform float uC${i}Radius;\n`;
+    logic += `  { vec2 d = vScreenPos - uC${i}Pos; float r = max(uC${i}Radius, 0.001); alpha = min(alpha, smoothstep(r * 0.2, r, length(d))); }\n`;
+  }
+  return `
 precision mediump float;
 varying vec2 vScreenPos;
 uniform vec2 uLightPos;
 uniform float uLightRadius;
-uniform vec2 uCandlePos[MAX_CANDLES];
-uniform float uCandleRadius[MAX_CANDLES];
-
+${uniforms}
 void main() {
     vec2 delta = vScreenPos - uLightPos;
     float dist = length(delta);
@@ -31,18 +36,13 @@ void main() {
     float glow = smoothstep(uLightRadius * 0.88, uLightRadius * 1.05, dist) * 0.06;
 
     float alpha = max(max(hotspot, cutoff), glow);
-
-    for (int i = 0; i < MAX_CANDLES; i++) {
-        vec2 cDelta = vScreenPos - uCandlePos[i];
-        float cDist = length(cDelta);
-        float r = max(uCandleRadius[i], 0.001);
-        float cAlpha = smoothstep(r * 0.2, r, cDist);
-        alpha = min(alpha, cAlpha);
-    }
-
+${logic}
     gl_FragColor = vec4(0.0, 0.0, 0.0, alpha);
 }
 `;
+}
+
+const FRAGMENT_SRC = buildFragmentSrc();
 
 let _sharedProgram = null;
 function getProgram() {
@@ -52,10 +52,18 @@ function getProgram() {
   return _sharedProgram;
 }
 
-/**
- * 手电筒视野系统 — 使用自定义 PIXI.Shader 直接渲染全屏 Mesh，
- * 支持多个蜡烛光源（candle apertures）。
- */
+function buildUniforms(x, y, radius) {
+  const u = {
+    uLightPos:    new Float32Array([x, y]),
+    uLightRadius: radius,
+  };
+  for (let i = 0; i < MAX_CANDLES; i++) {
+    u[`uC${i}Pos`] = new Float32Array([0, 0]);
+    u[`uC${i}Radius`] = 0.001;
+  }
+  return u;
+}
+
 export class VisionSystem {
   constructor(app, overlayContainer, x, y, radius) {
     this.app = app;
@@ -72,16 +80,7 @@ export class VisionSystem {
     const w = app.screen.width;
     const h = app.screen.height;
 
-    this._shader = new PIXI.Shader(getProgram(), {
-      uLightPos:      new Float32Array([x, y]),
-      uLightRadius:   radius,
-      uCandlePos:     new Float32Array(MAX_CANDLES * 2),
-      uCandleRadius:  new Float32Array(MAX_CANDLES),
-    });
-    // Initialize inactive candle slots
-    for (let i = 0; i < MAX_CANDLES; i++) {
-      this._shader.uniforms.uCandleRadius[i] = 0.001;
-    }
+    this._shader = new PIXI.Shader(getProgram(), buildUniforms(x, y, radius));
 
     this.darkness = this._createMesh(w, h);
     this.container.addChild(this.darkness);
@@ -97,26 +96,20 @@ export class VisionSystem {
     return new PIXI.Mesh(geometry, this._shader);
   }
 
-  /**
-   * Must be called BEFORE update() each frame.
-   * Populates candle uniform arrays; update()'s scalar assignment triggers GPU upload.
-   */
   setCandles(candleList) {
-    const pos = new Float32Array(MAX_CANDLES * 2);
-    const rad = new Float32Array(MAX_CANDLES);
     const count = Math.min(candleList.length, MAX_CANDLES);
-
-    for (let i = 0; i < count; i++) {
-      pos[i * 2] = candleList[i].x;
-      pos[i * 2 + 1] = candleList[i].y;
-      rad[i] = Math.max(candleList[i].currentRadius, 0.001);
+    for (let i = 0; i < MAX_CANDLES; i++) {
+      if (i < count) {
+        const c = candleList[i];
+        const pos = this._shader.uniforms[`uC${i}Pos`];
+        pos[0] = c.x;
+        pos[1] = c.y;
+        this._shader.uniforms[`uC${i}Pos`] = pos;
+        this._shader.uniforms[`uC${i}Radius`] = Math.max(c.currentRadius, 0.001);
+      } else {
+        this._shader.uniforms[`uC${i}Radius`] = 0.001;
+      }
     }
-    for (let i = count; i < MAX_CANDLES; i++) {
-      rad[i] = 0.001;
-    }
-    // Assign new arrays to trigger PixiJS uniform dirty flag → GPU upload
-    this._shader.uniforms.uCandlePos = pos;
-    this._shader.uniforms.uCandleRadius = rad;
   }
 
   update(x, y) {
@@ -186,7 +179,6 @@ export class VisionSystem {
     return Math.sqrt(dx * dx + dy * dy) <= this.currentRadius;
   }
 
-  /** Check if (x,y) is inside any placed candle light. */
   isInCandleLight(x, y, extraLights) {
     for (const light of extraLights) {
       const dx = x - light.x;

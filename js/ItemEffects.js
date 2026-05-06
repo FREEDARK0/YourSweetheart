@@ -146,6 +146,11 @@ export class ItemEffects {
     const slot = game.inventory.candle;
     if (slot.count < slot.max) {
       slot.count++;
+      game.groundText.spawn('+1 蜡烛', item.x, item.y - 30,
+        { fontSize: 22, duration: 1500, visibleOutsideVision: true });
+    } else {
+      game.groundText.spawn('已满', item.x, item.y - 30,
+        { fontSize: 18, duration: 1000, visibleOutsideVision: true });
     }
   }
 

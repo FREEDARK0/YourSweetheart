@@ -550,7 +550,7 @@ export class Game {
     if (this.inventory.candle.count <= 0) return;
     this.inventory.candle.count--;
 
-    const radius = Math.max(30, this.visionRadius * 0.7);
+    const radius = Math.max(50, this.visionRadius * 0.85);
     this.placedCandles.push({
       x: this.mouseX,
       y: this.mouseY,
@@ -559,6 +559,9 @@ export class Game {
       elapsed: 0,
       state: 'stable',
     });
+
+    this.groundText.spawn('[蜡烛]', this.mouseX, this.mouseY - 20,
+      { fontSize: 22, duration: 1500, visibleOutsideVision: true });
   }
 
   _updateCandles(dt) {
